@@ -12,6 +12,10 @@ import { documentRouter } from './document.js';
 import { taskRouter } from './task.js';
 import { reportRouter } from './report.js';
 import { aiRouter } from './ai.js';
+import { invoiceRouter } from './invoice.js';
+import { expenseRouter } from './expense.js';
+import { form1099Router } from './form1099.js';
+import { recurringRouter } from './recurring.js';
 
 export const appRouter = router({
   auth: authRouter,
@@ -27,6 +31,10 @@ export const appRouter = router({
   task: taskRouter,
   report: reportRouter,
   ai: aiRouter,
+  invoice: invoiceRouter,
+  expense: expenseRouter,
+  form1099: form1099Router,
+  recurring: recurringRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -875,3 +875,317 @@ export const reportSnapshots = pgTable('report_snapshots', {
 export const reportSnapshotsRelations = relations(reportSnapshots, ({ one }) => ({
   organization: one(organizations, { fields: [reportSnapshots.orgId], references: [organizations.id] }),
 }));
+
+// ============================================================================
+// NEW ENUMS FOR V2.5 MODULES
+// ============================================================================
+
+export const invoiceStatusEnum = pgEnum('invoice_status', [
+  'draft', 'sent', 'viewed', 'paid', 'partially_paid', 'overdue', 'cancelled', 'refunded',
+]);
+
+export const paymentMethodEnum = pgEnum('payment_method', [
+  'cash', 'check', 'ach', 'wire', 'credit_card', 'debit_card', 'stripe', 'paypal', 'other',
+]);
+
+export const recurringFrequencyEnum = pgEnum('recurring_frequency', [
+  'daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'semiannually', 'annually',
+]);
+
+export const expenseStatusEnum = pgEnum('expense_status', [
+  'draft', 'submitted', 'under_review', 'approved', 'rejected', 'reimbursed',
+]);
+
+export const form1099TypeEnum = pgEnum('form_1099_type', [
+  'nec', 'misc', 'int', 'div', 'r', 's', 'k',
+]);
+
+export const form1099StatusEnum = pgEnum('form_1099_status', [
+  'draft', 'generated', 'distributed', 'filed', 'corrected',
+]);
+
+// ============================================================================
+// INVOICE & AR MODULE
+// ============================================================================
+
+export const invoices = pgTable('invoices', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  invoiceNumber: varchar('invoice_number', { length: 50 }).notNull(),
+  contactId: uuid('contact_id').notNull().references(() => contacts.id, { onDelete: 'restrict' }),
+  issueDate: date('issue_date').notNull(),
+  dueDate: date('due_date').notNull(),
+  status: invoiceStatusEnum('status').default('draft'),
+  subtotal: decimal('subtotal', { precision: 15, scale: 2 }).notNull().default('0'),
+  taxAmount: decimal('tax_amount', { precision: 15, scale: 2 }).default('0'),
+  discountAmount: decimal('discount_amount', { precision: 15, scale: 2 }).default('0'),
+  totalAmount: decimal('total_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+  amountPaid: decimal('amount_paid', { precision: 15, scale: 2 }).default('0'),
+  amountDue: decimal('amount_due', { precision: 15, scale: 2 }).default('0'),
+  taxRate: decimal('tax_rate', { precision: 5, scale: 2 }).default('0'),
+  terms: varchar('terms', { length: 255 }), // e.g., "Net 30", "Due on Receipt"
+  poNumber: varchar('po_number', { length: 100 }),
+  notes: text('notes'),
+  footer: text('footer'),
+  sentAt: timestamp('sent_at', { withTimezone: true }),
+  paidAt: timestamp('paid_at', { withTimezone: true }),
+  template: varchar('template', { length: 50 }).default('default'),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  uniqueIndex('idx_invoice_org_number').on(table.orgId, table.invoiceNumber),
+  index('idx_invoice_org').on(table.orgId),
+  index('idx_invoice_contact').on(table.contactId),
+  index('idx_invoice_status').on(table.status),
+  index('idx_invoice_due').on(table.dueDate),
+  index('idx_invoice_issue').on(table.issueDate),
+  index('idx_invoice_overdue').on(table.dueDate).where(table.status.notInArray(['paid', 'cancelled', 'refunded'])),
+]);
+
+export const invoicesRelations = relations(invoices, ({ one, many }) => ({
+  organization: one(organizations, { fields: [invoices.orgId], references: [organizations.id] }),
+  contact: one(contacts, { fields: [invoices.contactId], references: [contacts.id] }),
+  lines: many(invoiceLines),
+  payments: many(payments),
+}));
+
+export const invoiceLines = pgTable('invoice_lines', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  invoiceId: uuid('invoice_id').notNull().references(() => invoices.id, { onDelete: 'cascade' }),
+  lineNumber: integer('line_number').notNull(),
+  description: text('description').notNull(),
+  quantity: decimal('quantity', { precision: 10, scale: 2 }).default('1'),
+  unitPrice: decimal('unit_price', { precision: 15, scale: 2 }).default('0'),
+  amount: decimal('amount', { precision: 15, scale: 2 }).notNull().default('0'),
+  taxRate: decimal('tax_rate', { precision: 5, scale: 2 }).default('0'),
+  taxAmount: decimal('tax_amount', { precision: 15, scale: 2 }).default('0'),
+  discountAmount: decimal('discount_amount', { precision: 15, scale: 2 }).default('0'),
+  accountId: uuid('account_id').references(() => chartOfAccounts.id, { onDelete: 'set null' }),
+  metadata: jsonb('metadata').default('{}'),
+}, (table) => [
+  index('idx_inv_line_invoice').on(table.invoiceId),
+  index('idx_inv_line_org').on(table.orgId),
+  index('idx_inv_line_account').on(table.accountId),
+]);
+
+export const invoiceLinesRelations = relations(invoiceLines, ({ one }) => ({
+  invoice: one(invoices, { fields: [invoiceLines.invoiceId], references: [invoices.id] }),
+  account: one(chartOfAccounts, { fields: [invoiceLines.accountId], references: [chartOfAccounts.id] }),
+}));
+
+export const payments = pgTable('payments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  invoiceId: uuid('invoice_id').references(() => invoices.id, { onDelete: 'set null' }),
+  contactId: uuid('contact_id').references(() => contacts.id, { onDelete: 'set null' }),
+  paymentDate: date('payment_date').notNull(),
+  amount: decimal('amount', { precision: 15, scale: 2 }).notNull().default('0'),
+  paymentMethod: paymentMethodEnum('payment_method').default('check'),
+  referenceNumber: varchar('reference_number', { length: 255 }),
+  memo: text('memo'),
+  bankAccountId: uuid('bank_account_id').references(() => bankAccounts.id, { onDelete: 'set null' }),
+  depositedAt: timestamp('deposited_at', { withTimezone: true }),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_payment_org').on(table.orgId),
+  index('idx_payment_invoice').on(table.invoiceId),
+  index('idx_payment_contact').on(table.contactId),
+  index('idx_payment_date').on(table.paymentDate),
+  index('idx_payment_bank').on(table.bankAccountId),
+]);
+
+export const paymentsRelations = relations(payments, ({ one }) => ({
+  organization: one(organizations, { fields: [payments.orgId], references: [organizations.id] }),
+  invoice: one(invoices, { fields: [payments.invoiceId], references: [invoices.id] }),
+  contact: one(contacts, { fields: [payments.contactId], references: [contacts.id] }),
+  bankAccount: one(bankAccounts, { fields: [payments.bankAccountId], references: [bankAccounts.id] }),
+}));
+
+// ============================================================================
+// RECURRING TRANSACTIONS MODULE
+// ============================================================================
+
+export const recurringTransactions = pgTable('recurring_transactions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  accountId: uuid('account_id').notNull().references(() => chartOfAccounts.id, { onDelete: 'restrict' }),
+  contactId: uuid('contact_id').references(() => contacts.id, { onDelete: 'set null' }),
+  transactionType: transactionTypeEnum('transaction_type').notNull(),
+  amount: decimal('amount', { precision: 15, scale: 2 }).notNull(),
+  debitCredit: debitCreditEnum('debit_credit').notNull(),
+  frequency: recurringFrequencyEnum('frequency').notNull(),
+  startDate: date('start_date').notNull(),
+  endDate: date('end_date'),
+  nextRunDate: date('next_run_date').notNull(),
+  lastRunDate: date('last_run_date'),
+  dayOfMonth: integer('day_of_month'), // 1-31 for monthly
+  isActive: boolean('is_active').default(true),
+  autoPost: boolean('auto_post').default(false), // if true, creates posted transaction; if false, creates draft
+  totalRuns: integer('total_runs').default(0),
+  maxRuns: integer('max_runs'), // null = unlimited
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_recurring_org').on(table.orgId),
+  index('idx_recurring_account').on(table.accountId),
+  index('idx_recurring_contact').on(table.contactId),
+  index('idx_recurring_active').on(table.isActive).where(table.isActive.eq(true)),
+  index('idx_recurring_next').on(table.nextRunDate),
+  index('idx_recurring_freq').on(table.frequency),
+]);
+
+export const recurringTransactionsRelations = relations(recurringTransactions, ({ one }) => ({
+  organization: one(organizations, { fields: [recurringTransactions.orgId], references: [organizations.id] }),
+  account: one(chartOfAccounts, { fields: [recurringTransactions.accountId], references: [chartOfAccounts.id] }),
+  contact: one(contacts, { fields: [recurringTransactions.contactId], references: [contacts.id] }),
+}));
+
+// ============================================================================
+// EXPENSE MANAGEMENT MODULE
+// ============================================================================
+
+export const expenseReports = pgTable('expense_reports', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  employeeId: uuid('employee_id').notNull().references(() => employees.id, { onDelete: 'restrict' }),
+  reportName: varchar('report_name', { length: 255 }).notNull(),
+  periodStart: date('period_start').notNull(),
+  periodEnd: date('period_end').notNull(),
+  status: expenseStatusEnum('status').default('draft'),
+  totalAmount: decimal('total_amount', { precision: 15, scale: 2 }).default('0'),
+  reimbursedAmount: decimal('reimbursed_amount', { precision: 15, scale: 2 }).default('0'),
+  submittedAt: timestamp('submitted_at', { withTimezone: true }),
+  reviewedBy: uuid('reviewed_by').references(() => users.id, { onDelete: 'set null' }),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+  approvedBy: uuid('approved_by').references(() => users.id, { onDelete: 'set null' }),
+  approvedAt: timestamp('approved_at', { withTimezone: true }),
+  notes: text('notes'),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_expense_report_org').on(table.orgId),
+  index('idx_expense_report_employee').on(table.employeeId),
+  index('idx_expense_report_status').on(table.status),
+  index('idx_expense_report_period').on(table.periodStart, table.periodEnd),
+]);
+
+export const expenseReportsRelations = relations(expenseReports, ({ one, many }) => ({
+  organization: one(organizations, { fields: [expenseReports.orgId], references: [organizations.id] }),
+  employee: one(employees, { fields: [expenseReports.employeeId], references: [employees.id] }),
+  reviewer: one(users, { fields: [expenseReports.reviewedBy], references: [users.id] }),
+  approver: one(users, { fields: [expenseReports.approvedBy], references: [users.id] }),
+  items: many(expenseItems),
+}));
+
+export const expenseItems = pgTable('expense_items', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  expenseReportId: uuid('expense_report_id').notNull().references(() => expenseReports.id, { onDelete: 'cascade' }),
+  expenseDate: date('expense_date').notNull(),
+  description: text('description').notNull(),
+  category: varchar('category', { length: 100 }).notNull(), // meals, travel, office, etc.
+  amount: decimal('amount', { precision: 15, scale: 2 }).notNull().default('0'),
+  taxAmount: decimal('tax_amount', { precision: 15, scale: 2 }).default('0'),
+  currency: varchar('currency', { length: 3 }).default('USD'),
+  vendor: varchar('vendor', { length: 255 }),
+  receiptPath: text('receipt_path'), // Supabase Storage path
+  receiptUploaded: boolean('receipt_uploaded').default(false),
+  isBillable: boolean('is_billable').default(false),
+  invoiceId: uuid('invoice_id').references(() => invoices.id, { onDelete: 'set null' }), // if billable, linked to invoice
+  mileage: decimal('mileage', { precision: 8, scale: 2 }), // if mileage expense
+  approved: boolean('approved').default(false),
+  approvedBy: uuid('approved_by').references(() => users.id, { onDelete: 'set null' }),
+  notes: text('notes'),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_expense_item_report').on(table.expenseReportId),
+  index('idx_expense_item_org').on(table.orgId),
+  index('idx_expense_item_date').on(table.expenseDate),
+  index('idx_expense_item_category').on(table.category),
+  index('idx_expense_item_invoice').on(table.invoiceId),
+]);
+
+export const expenseItemsRelations = relations(expenseItems, ({ one }) => ({
+  expenseReport: one(expenseReports, { fields: [expenseItems.expenseReportId], references: [expenseReports.id] }),
+  invoice: one(invoices, { fields: [expenseItems.invoiceId], references: [invoices.id] }),
+  approver: one(users, { fields: [expenseItems.approvedBy], references: [users.id] }),
+}));
+
+// ============================================================================
+// 1099 FORMS MODULE
+// ============================================================================
+
+export const form1099s = pgTable('form_1099s', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  contactId: uuid('contact_id').notNull().references(() => contacts.id, { onDelete: 'restrict' }),
+  taxYearId: uuid('tax_year_id').notNull().references(() => taxYears.id, { onDelete: 'cascade' }),
+  formType: form1099TypeEnum('form_type').notNull().default('nec'),
+  formStatus: form1099StatusEnum('form_status').default('draft'),
+  // Box 1 — Nonemployee compensation (NEC) or Other income (MISC)
+  box1: decimal('box_1', { precision: 15, scale: 2 }).default('0'),
+  // Box 2 — Reserved / Royalties
+  box2: decimal('box_2', { precision: 15, scale: 2 }).default('0'),
+  // Box 3 — Other income
+  box3: decimal('box_3', { precision: 15, scale: 2 }).default('0'),
+  // Box 4 — Federal income tax withheld
+  box4: decimal('box_4', { precision: 15, scale: 2 }).default('0'),
+  // Box 5 — Fishing boat proceeds
+  box5: decimal('box_5', { precision: 15, scale: 2 }).default('0'),
+  // Box 6 — Medical and health care payments
+  box6: decimal('box_6', { precision: 15, scale: 2 }).default('0'),
+  // Box 7 — Payer made direct sales of $5000 or more of consumer products
+  box7DirectSales: boolean('box_7_direct_sales').default(false),
+  // Box 8 — Substitute payments in lieu of dividends or interest
+  box8: decimal('box_8', { precision: 15, scale: 2 }).default('0'),
+  // Box 9 — Crop insurance proceeds
+  box9: decimal('box_9', { precision: 15, scale: 2 }).default('0'),
+  // Box 10 — Gross proceeds paid to an attorney
+  box10: decimal('box_10', { precision: 15, scale: 2 }).default('0'),
+  // Box 11 — Fish purchased for resale
+  box11: decimal('box_11', { precision: 15, scale: 2 }).default('0'),
+  // Box 13 — Excess golden parachute payments
+  box13: decimal('box_13', { precision: 15, scale: 2 }).default('0'),
+  // Box 14 — Nonqualified deferred compensation
+  box14: decimal('box_14', { precision: 15, scale: 2 }).default('0'),
+  // Box 15 — State tax withheld
+  stateTaxes: jsonb('state_taxes').default('[]'),
+  // Box 16 — State/Payer's state number
+  stateInfo: jsonb('state_info').default('[]'),
+  // Corrected form
+  corrected1099Id: uuid('corrected_1099_id').references(() => form1099s.id, { onDelete: 'set null' }),
+  // Distribution & filing
+  copyDistributedAt: timestamp('copy_distributed_at', { withTimezone: true }),
+  irsFiledAt: timestamp('irs_filed_at', { withTimezone: true }),
+  generatedPdfPath: text('generated_pdf_path'),
+  // Source data
+  totalPayments: decimal('total_payments', { precision: 15, scale: 2 }).default('0'),
+  paymentCount: integer('payment_count').default(0),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  uniqueIndex('idx_1099_contact_year').on(table.contactId, table.taxYearId, table.formType),
+  index('idx_1099_org').on(table.orgId),
+  index('idx_1099_contact').on(table.contactId),
+  index('idx_1099_year').on(table.taxYearId),
+  index('idx_1099_status').on(table.formStatus),
+  index('idx_1099_corrected').on(table.corrected1099Id),
+]);
+
+export const form1099sRelations = relations(form1099s, ({ one }) => ({
+  organization: one(organizations, { fields: [form1099s.orgId], references: [organizations.id] }),
+  contact: one(contacts, { fields: [form1099s.contactId], references: [contacts.id] }),
+  taxYear: one(taxYears, { fields: [form1099s.taxYearId], references: [taxYears.id] }),
+  corrected1099: one(form1099s, { fields: [form1099s.corrected1099Id], references: [form1099s.id] }),
+}));
