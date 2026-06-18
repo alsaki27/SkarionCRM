@@ -35,6 +35,17 @@ import ReportBalanceSheet from './pages/Reports/ReportBalanceSheet.tsx';
 import ReportCashFlow from './pages/Reports/ReportCashFlow.tsx';
 import Organization from './pages/Settings/Organization.tsx';
 import Users from './pages/Settings/Users.tsx';
+import InvoiceList from './pages/Invoices/InvoiceList.tsx';
+import InvoiceDetail from './pages/Invoices/InvoiceDetail.tsx';
+import InvoiceForm from './pages/Invoices/InvoiceForm.tsx';
+import RecurringList from './pages/Recurring/RecurringList.tsx';
+import RecurringForm from './pages/Recurring/RecurringForm.tsx';
+import ExpenseList from './pages/Expenses/ExpenseList.tsx';
+import ExpenseDetail from './pages/Expenses/ExpenseDetail.tsx';
+import ExpenseForm from './pages/Expenses/ExpenseForm.tsx';
+import Form1099List from './pages/Form1099/Form1099List.tsx';
+import Form1099Generate from './pages/Form1099/Form1099Generate.tsx';
+import Form1099Detail from './pages/Form1099/Form1099Detail.tsx';
 
 function App() {
   const { user, isAuthenticated, setAuth, logout } = useAuthStore();
@@ -123,6 +134,28 @@ function App() {
         <Route path="/reports/balance-sheet" element={<ReportBalanceSheet />} />
         <Route path="/reports/cash-flow" element={<ReportCashFlow />} />
         
+        {/* Invoices */}
+        <Route path="/invoices" element={<InvoiceList />} />
+        <Route path="/invoices/new" element={<InvoiceForm />} />
+        <Route path="/invoices/:id" element={<InvoiceDetail />} />
+        <Route path="/invoices/:id/edit" element={<InvoiceForm />} />
+
+        {/* Recurring Transactions */}
+        <Route path="/recurring" element={<RecurringList />} />
+        <Route path="/recurring/new" element={<RecurringForm />} />
+        <Route path="/recurring/:id/edit" element={<RecurringForm />} />
+
+        {/* Expenses */}
+        <Route path="/expenses" element={<ExpenseList />} />
+        <Route path="/expenses/new" element={<ExpenseForm />} />
+        <Route path="/expenses/:id" element={<ExpenseDetail />} />
+        <Route path="/expenses/:id/edit" element={<ExpenseForm />} />
+
+        {/* Form 1099 */}
+        <Route path="/form1099" element={<Form1099List />} />
+        <Route path="/form1099/generate" element={<Form1099Generate />} />
+        <Route path="/form1099/:id" element={<Form1099Detail />} />
+
         {/* Settings */}
         <Route path="/settings/organization" element={<Organization />} />
         <Route path="/settings/users" element={<Users />} />

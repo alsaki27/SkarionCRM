@@ -18,6 +18,8 @@ import {
   LogOut,
   User,
   X,
+  RefreshCw,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -74,6 +76,38 @@ const navItems: NavItem[] = [
       { label: 'Dashboard', path: '/w2/dashboard' },
       { label: 'W2 List', path: '/w2/list' },
       { label: 'Generate', path: '/w2/generate' },
+    ],
+  },
+  {
+    label: 'Invoices',
+    icon: <FileText size={18} />,
+    subItems: [
+      { label: 'All Invoices', path: '/invoices' },
+      { label: 'New Invoice', path: '/invoices/new' },
+    ],
+  },
+  {
+    label: 'Recurring',
+    icon: <RefreshCw size={18} />,
+    subItems: [
+      { label: 'Recurring Transactions', path: '/recurring' },
+      { label: 'New Recurring', path: '/recurring/new' },
+    ],
+  },
+  {
+    label: 'Expenses',
+    icon: <Receipt size={18} />,
+    subItems: [
+      { label: 'Expense Reports', path: '/expenses' },
+      { label: 'New Report', path: '/expenses/new' },
+    ],
+  },
+  {
+    label: 'Form 1099',
+    icon: <FileSpreadsheet size={18} />,
+    subItems: [
+      { label: '1099 List', path: '/form1099' },
+      { label: 'Generate 1099', path: '/form1099/generate' },
     ],
   },
   { label: 'Documents', icon: <FolderOpen size={18} />, path: '/documents' },

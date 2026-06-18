@@ -2,7 +2,9 @@ import 'dotenv/config';
 import { db } from './db/index.js';
 import {
   organizations, users, chartOfAccounts, bankAccounts, taxYears,
-  complianceCategories, documentTemplates, pipelineStages, programs, leadSources
+  complianceCategories, documentTemplates, pipelineStages, programs, leadSources,
+  contacts, employees, invoices, invoiceLines, payments, recurringTransactions,
+  expenseReports, expenseItems, form1099s,
 } from './db/schema.js';
 import { authService } from '../services/auth.js';
 import { eq } from 'drizzle-orm';
@@ -169,6 +171,163 @@ async function seed() {
     });
   }
   console.log('Created', templates.length, 'document templates');
+
+  // 8. Create contacts (customer + vendor)
+  const [customer] = await db.insert(contacts).values({
+    orgId: org.id,
+    fullName: 'Acme Corp',
+    email: 'billing@acme.com',
+    phone: '+1-555-0100',
+    contactType: 'customer',
+    address: { street: '456 Commerce Ave', city: 'New York', state: 'NY', zip: '10002', country: 'US' },
+    isActive: true,
+  }).returning();
+
+  const [vendor] = await db.insert(contacts).values({
+    orgId: org.id,
+    fullName: 'Freelance Design LLC',
+    email: 'invoice@freelancedesign.com',
+    phone: '+1-555-0200',
+    contactType: 'vendor',
+    is1099Recipient: true,
+    taxId: '98-7654321',
+    taxClassification: 'llc',
+    address: { street: '789 Creative St', city: 'Brooklyn', state: 'NY', zip: '11201', country: 'US' },
+    isActive: true,
+  }).returning();
+  console.log('Created 2 contacts');
+
+  // 9. Create employee
+  const [employee] = await db.insert(employees).values({
+    orgId: org.id,
+    firstName: 'Jane',
+    lastName: 'Smith',
+    fullName: 'Jane Smith',
+    email: 'jane@democompany.com',
+    phone: '+1-555-0300',
+    hireDate: '2023-01-15',
+    status: 'active',
+    jobTitle: 'Sales Manager',
+    department: 'Sales',
+    payType: 'salary',
+    payRate: '75000',
+    payFrequency: 'biweekly',
+    isActive: true,
+  }).returning();
+  console.log('Created employee:', employee.fullName);
+
+  // 10. Create sample invoice
+  const [invoice] = await db.insert(invoices).values({
+    orgId: org.id,
+    invoiceNumber: 'INV-001',
+    contactId: customer.id,
+    issueDate: `${currentYear}-01-15`,
+    dueDate: `${currentYear}-02-15`,
+    status: 'sent',
+    subtotal: '2500.00',
+    taxAmount: '200.00',
+    discountAmount: '0',
+    totalAmount: '2700.00',
+    amountPaid: '1000.00',
+    amountDue: '1700.00',
+    taxRate: '8.00',
+    terms: 'Net 30',
+    poNumber: 'PO-2024-001',
+    notes: 'Website redesign project - Phase 1',
+    footer: 'Thank you for your business!',
+  }).returning();
+
+  await db.insert(invoiceLines).values([
+    { orgId: org.id, invoiceId: invoice.id, lineNumber: 1, description: 'Website design', quantity: '1', unitPrice: '1500.00', amount: '1500.00', taxRate: '8.00', taxAmount: '120.00' },
+    { orgId: org.id, invoiceId: invoice.id, lineNumber: 2, description: 'Development hours', quantity: '20', unitPrice: '50.00', amount: '1000.00', taxRate: '8.00', taxAmount: '80.00' },
+  ]);
+
+  await db.insert(payments).values({
+    orgId: org.id,
+    invoiceId: invoice.id,
+    contactId: customer.id,
+    paymentDate: `${currentYear}-01-20`,
+    amount: '1000.00',
+    paymentMethod: 'ach',
+    referenceNumber: 'ACH-001',
+    memo: 'Partial payment',
+    bankAccountId: bank1.id,
+  });
+  console.log('Created invoice INV-001 with 2 lines and 1 payment');
+
+  // 11. Create recurring transaction (monthly rent)
+  const [recurring] = await db.insert(recurringTransactions).values({
+    orgId: org.id,
+    name: 'Monthly Office Rent',
+    description: 'Automatic monthly rent payment',
+    accountId: createdAccounts.find(a => a.code === '5100')!.id,
+    transactionType: 'withdrawal',
+    amount: '3500.00',
+    debitCredit: 'debit',
+    frequency: 'monthly',
+    startDate: `${currentYear}-01-01`,
+    nextRunDate: `${currentYear}-02-01`,
+    dayOfMonth: 1,
+    isActive: true,
+    autoPost: true,
+    totalRuns: 1,
+    maxRuns: 24,
+  }).returning();
+  console.log('Created recurring transaction:', recurring.name);
+
+  // 12. Create expense report
+  const [expenseReport] = await db.insert(expenseReports).values({
+    orgId: org.id,
+    employeeId: employee.id,
+    reportName: 'January 2024 Travel',
+    periodStart: `${currentYear}-01-01`,
+    periodEnd: `${currentYear}-01-31`,
+    status: 'approved',
+    totalAmount: '850.00',
+    reimbursedAmount: '850.00',
+    submittedAt: new Date(`${currentYear}-01-25T10:00:00Z`),
+    approvedAt: new Date(`${currentYear}-01-26T14:00:00Z`),
+    notes: 'Client meeting in Chicago',
+  }).returning();
+
+  await db.insert(expenseItems).values([
+    { orgId: org.id, expenseReportId: expenseReport.id, expenseDate: `${currentYear}-01-10`, description: 'Flight to Chicago', category: 'Travel', amount: '450.00', taxAmount: '36.00', vendor: 'United Airlines', receiptUploaded: true },
+    { orgId: org.id, expenseReportId: expenseReport.id, expenseDate: `${currentYear}-01-10`, description: 'Hotel - 2 nights', category: 'Lodging', amount: '280.00', taxAmount: '22.40', vendor: 'Marriott', receiptUploaded: true },
+    { orgId: org.id, expenseReportId: expenseReport.id, expenseDate: `${currentYear}-01-11`, description: 'Client dinner', category: 'Meals', amount: '120.00', taxAmount: '9.60', vendor: 'Steakhouse', receiptUploaded: true },
+  ]);
+  console.log('Created expense report with 3 items');
+
+  // 13. Create Form 1099-NEC
+  await db.insert(payments).values({
+    orgId: org.id,
+    contactId: vendor.id,
+    paymentDate: `${currentYear}-06-15`,
+    amount: '3500.00',
+    paymentMethod: 'ach',
+    referenceNumber: 'VENDOR-001',
+    memo: 'Brand design project',
+  });
+  await db.insert(payments).values({
+    orgId: org.id,
+    contactId: vendor.id,
+    paymentDate: `${currentYear}-09-20`,
+    amount: '2800.00',
+    paymentMethod: 'ach',
+    referenceNumber: 'VENDOR-002',
+    memo: 'Marketing collateral',
+  });
+
+  const [form1099] = await db.insert(form1099s).values({
+    orgId: org.id,
+    contactId: vendor.id,
+    taxYearId: taxYear.id,
+    formType: 'nec',
+    formStatus: 'draft',
+    box1: '6300.00',
+    totalPayments: '6300.00',
+    paymentCount: 2,
+  }).returning();
+  console.log('Created Form 1099-NEC for', vendor.fullName);
 
   console.log('\nSeed complete!');
   console.log('Login with: admin@democompany.com / admin123');

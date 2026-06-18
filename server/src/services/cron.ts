@@ -1,6 +1,6 @@
 import { CronJob } from 'cron';
 import { db } from '../db/index.js';
-import { tasks, taxForms, complianceItems } from '../db/schema.js';
+import { recurringTransactions, transactions } from '../db/schema.js';
 import { eq, and, lte, gte, notInArray } from 'drizzle-orm';
 
 export function initializeCronJobs() {
@@ -61,11 +61,63 @@ export function initializeCronJobs() {
     console.log(`[CRON] Found ${upcomingItems.length} compliance items with upcoming deadlines`);
   }).start();
 
-  // Daily at 2 AM: Generate report snapshots
-  new CronJob('0 2 * * *', async () => {
-    console.log('[CRON] Generating report snapshots...');
-    // This would call the report service to generate snapshots
-    console.log('[CRON] Report snapshots scheduled');
+  // Daily at 3 AM: Auto-run recurring transactions (generate drafts)
+  new CronJob('0 3 * * *', async () => {
+    console.log('[CRON] Processing recurring transactions...');
+    const today = new Date().toISOString().split('T')[0];
+
+    const due = await db.query.recurringTransactions.findMany({
+      where: and(
+        eq(recurringTransactions.isActive, true),
+        lte(recurringTransactions.nextRunDate, today)
+      ),
+    });
+
+    for (const rec of due) {
+      // Create a transaction row
+      await db.insert(transactions).values({
+        orgId: rec.orgId,
+        accountId: rec.accountId,
+        contactId: rec.contactId,
+        transactionType: rec.transactionType,
+        description: rec.name,
+        amount: rec.amount,
+        debitCredit: rec.debitCredit,
+        transactionDate: rec.nextRunDate,
+        referenceNumber: `Auto: ${rec.frequency}`,
+        memo: rec.description,
+        createdBy: 'system',
+      });
+
+      // Update recurring transaction
+      const nextDate = new Date(rec.nextRunDate);
+      switch (rec.frequency) {
+        case 'daily': nextDate.setDate(nextDate.getDate() + 1); break;
+        case 'weekly': nextDate.setDate(nextDate.getDate() + 7); break;
+        case 'biweekly': nextDate.setDate(nextDate.getDate() + 14); break;
+        case 'monthly': nextDate.setMonth(nextDate.getMonth() + 1); break;
+        case 'quarterly': nextDate.setMonth(nextDate.getMonth() + 3); break;
+        case 'semiannually': nextDate.setMonth(nextDate.getMonth() + 6); break;
+        case 'annually': nextDate.setFullYear(nextDate.getFullYear() + 1); break;
+      }
+      const nextRunDate = nextDate.toISOString().split('T')[0];
+      const totalRuns = (rec.totalRuns ?? 0) + 1;
+      const isActive =
+        (!rec.endDate || nextRunDate <= rec.endDate) &&
+        (!rec.maxRuns || totalRuns < rec.maxRuns);
+
+      await db.update(recurringTransactions)
+        .set({
+          nextRunDate,
+          lastRunDate: rec.nextRunDate,
+          totalRuns,
+          isActive,
+          updatedAt: new Date(),
+        })
+        .where(eq(recurringTransactions.id, rec.id));
+    }
+
+    console.log(`[CRON] Processed ${due.length} recurring transactions`);
   }).start();
 
   console.log('[CRON] All scheduled jobs initialized');
