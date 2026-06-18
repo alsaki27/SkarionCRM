@@ -20,6 +20,13 @@ import {
   X,
   RefreshCw,
   FileSpreadsheet,
+  Key,
+  Globe,
+  Plug,
+  Users2,
+  Bell,
+  Activity,
+  Import,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -122,11 +129,28 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    label: 'Integrations',
+    icon: <Plug size={18} />,
+    subItems: [
+      { label: 'Connectors', path: '/settings/integrations' },
+      { label: 'Import Data', path: '/settings/integrations' },
+    ],
+  },
+  {
+    label: 'Notifications',
+    icon: <Bell size={18} />,
+    path: '/notifications',
+  },
+  {
     label: 'Settings',
     icon: <Settings size={18} />,
     subItems: [
       { label: 'Organization', path: '/settings/organization' },
       { label: 'Users', path: '/settings/users' },
+      { label: 'API Keys', path: '/settings/api-keys' },
+      { label: 'Webhooks', path: '/settings/webhooks' },
+      { label: 'Integrations', path: '/settings/integrations' },
+      { label: 'Team Members', path: '/settings/team' },
     ],
   },
 ];

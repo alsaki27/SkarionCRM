@@ -46,6 +46,12 @@ import ExpenseForm from './pages/Expenses/ExpenseForm.tsx';
 import Form1099List from './pages/Form1099/Form1099List.tsx';
 import Form1099Generate from './pages/Form1099/Form1099Generate.tsx';
 import Form1099Detail from './pages/Form1099/Form1099Detail.tsx';
+import LandingPage from './pages/LandingPage.tsx';
+import NotificationList from './pages/Notifications/NotificationList.tsx';
+import ApiKeys from './pages/Settings/ApiKeys.tsx';
+import Webhooks from './pages/Settings/Webhooks.tsx';
+import Integrations from './pages/Settings/Integrations.tsx';
+import TeamMembers from './pages/Settings/TeamMembers.tsx';
 
 function App() {
   const { user, isAuthenticated, setAuth, logout } = useAuthStore();
@@ -69,7 +75,8 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
   }
@@ -159,6 +166,13 @@ function App() {
         {/* Settings */}
         <Route path="/settings/organization" element={<Organization />} />
         <Route path="/settings/users" element={<Users />} />
+        <Route path="/settings/api-keys" element={<ApiKeys />} />
+        <Route path="/settings/webhooks" element={<Webhooks />} />
+        <Route path="/settings/integrations" element={<Integrations />} />
+        <Route path="/settings/team" element={<TeamMembers />} />
+
+        {/* Notifications */}
+        <Route path="/notifications" element={<NotificationList />} />
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

@@ -16,6 +16,12 @@ import { invoiceRouter } from './invoice.js';
 import { expenseRouter } from './expense.js';
 import { form1099Router } from './form1099.js';
 import { recurringRouter } from './recurring.js';
+import { webhookRouter } from './webhook.js';
+import { apiKeyRouter } from './apiKey.js';
+import { notificationRouter } from './notification.js';
+import { activityRouter } from './activity.js';
+import { integrationRouter } from './integration.js';
+import { importJobRouter } from './importJob.js';
 
 export const appRouter = router({
   auth: authRouter,
@@ -35,6 +41,12 @@ export const appRouter = router({
   expense: expenseRouter,
   form1099: form1099Router,
   recurring: recurringRouter,
+  webhook: webhookRouter,
+  apiKey: apiKeyRouter,
+  notification: notificationRouter,
+  activity: activityRouter,
+  integration: integrationRouter,
+  importJob: importJobRouter,
 });
 
 export type AppRouter = typeof appRouter;

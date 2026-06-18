@@ -46,9 +46,29 @@ interface UIState {
   modalData: Record<string, unknown> | null;
   openModal: (modal: string, data?: Record<string, unknown>) => void;
   closeModal: () => void;
+  theme: 'light' | 'dark' | 'system';
+  setTheme: (theme: 'light' | 'dark' | 'system') => void;
+  toggleTheme: () => void;
+  isDarkMode: () => boolean;
 }
 
-export const useUIStore = create<UIState>()((set) => ({
+function getInitialTheme(): 'light' | 'dark' | 'system' {
+  if (typeof window === 'undefined') return 'system';
+  const stored = localStorage.getItem('skarion_theme');
+  if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
+  return 'system';
+}
+
+function resolveIsDarkMode(theme: 'light' | 'dark' | 'system'): boolean {
+  if (theme === 'dark') return true;
+  if (theme === 'light') return false;
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  return false;
+}
+
+export const useUIStore = create<UIState>()((set, get) => ({
   sidebarOpen: true,
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
@@ -56,4 +76,16 @@ export const useUIStore = create<UIState>()((set) => ({
   modalData: null,
   openModal: (modal, data) => set({ activeModal: modal, modalData: data || null }),
   closeModal: () => set({ activeModal: null, modalData: null }),
+  theme: getInitialTheme(),
+  setTheme: (theme) => {
+    localStorage.setItem('skarion_theme', theme);
+    set({ theme });
+  },
+  toggleTheme: () => {
+    const current = get().theme;
+    const next = current === 'light' ? 'dark' : current === 'dark' ? 'system' : 'light';
+    localStorage.setItem('skarion_theme', next);
+    set({ theme: next });
+  },
+  isDarkMode: () => resolveIsDarkMode(get().theme),
 }));

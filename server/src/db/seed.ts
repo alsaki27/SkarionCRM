@@ -1,11 +1,11 @@
 import 'dotenv/config';
-import { db } from './db/index.js';
+import { db } from './index.js';
 import {
   organizations, users, chartOfAccounts, bankAccounts, taxYears,
   complianceCategories, documentTemplates, pipelineStages, programs, leadSources,
   contacts, employees, invoices, invoiceLines, payments, recurringTransactions,
-  expenseReports, expenseItems, form1099s,
-} from './db/schema.js';
+  expenseReports, expenseItems, form1099s, plans, subscriptions,
+} from './schema.js';
 import { authService } from '../services/auth.js';
 import { eq } from 'drizzle-orm';
 
@@ -37,6 +37,98 @@ async function seed() {
     status: 'active',
   }).returning();
   console.log('Created organization:', org.name);
+
+  // 1.5 Create default plans
+  const [freePlan] = await db.insert(plans).values({
+    name: 'Free',
+    slug: 'free',
+    description: 'Perfect for freelancers and solo practitioners',
+    priceMonthly: '0',
+    priceYearly: '0',
+    interval: 'monthly',
+    maxUsers: 1,
+    maxContacts: 50,
+    maxEmployees: 3,
+    maxInvoices: 20,
+    maxTransactions: 200,
+    maxStorageMb: 100,
+    features: { invoicing: true, basicTax: true, basicReports: true, emailSupport: false, apiAccess: false, integrations: false, aiAssistant: false, advancedAnalytics: false },
+    isActive: true,
+    sortOrder: 1,
+  }).returning();
+
+  const [starterPlan] = await db.insert(plans).values({
+    name: 'Starter',
+    slug: 'starter',
+    description: 'For small businesses getting serious about finances',
+    priceMonthly: '29',
+    priceYearly: '290',
+    interval: 'monthly',
+    maxUsers: 3,
+    maxContacts: 500,
+    maxEmployees: 10,
+    maxInvoices: 200,
+    maxTransactions: 2000,
+    maxStorageMb: 1000,
+    features: { invoicing: true, taxFiling: true, payroll: true, basicReports: true, emailSupport: true, apiAccess: false, integrations: true, aiAssistant: false, advancedAnalytics: false, webhookAccess: false },
+    isActive: true,
+    sortOrder: 2,
+  }).returning();
+
+  const [proPlan] = await db.insert(plans).values({
+    name: 'Professional',
+    slug: 'professional',
+    description: 'Everything a growing business needs',
+    priceMonthly: '79',
+    priceYearly: '790',
+    interval: 'monthly',
+    maxUsers: 10,
+    maxContacts: 5000,
+    maxEmployees: 50,
+    maxInvoices: 1000,
+    maxTransactions: 10000,
+    maxStorageMb: 5000,
+    features: { invoicing: true, taxFiling: true, payroll: true, w2: true, form1099: true, advancedReports: true, emailSupport: true, prioritySupport: true, apiAccess: true, integrations: true, aiAssistant: true, advancedAnalytics: true, webhookAccess: true, customBranding: false, sso: false },
+    isActive: true,
+    sortOrder: 3,
+  }).returning();
+
+  const [enterprisePlan] = await db.insert(plans).values({
+    name: 'Enterprise',
+    slug: 'enterprise',
+    description: 'For large organizations with complex needs',
+    priceMonthly: '199',
+    priceYearly: '1990',
+    interval: 'monthly',
+    maxUsers: 100,
+    maxContacts: 50000,
+    maxEmployees: 500,
+    maxInvoices: 10000,
+    maxTransactions: 100000,
+    maxStorageMb: 50000,
+    features: { invoicing: true, taxFiling: true, payroll: true, w2: true, form1099: true, advancedReports: true, emailSupport: true, prioritySupport: true, dedicatedSupport: true, apiAccess: true, integrations: true, aiAssistant: true, advancedAnalytics: true, webhookAccess: true, customBranding: true, sso: true, sla: true, whiteLabel: true },
+    isActive: true,
+    sortOrder: 4,
+  }).returning();
+  console.log('Created 4 pricing plans');
+
+  // 1.6 Create subscription for demo org
+  const now = new Date();
+  const trialEnd = new Date(now);
+  trialEnd.setDate(trialEnd.getDate() + 14);
+  const periodEnd = new Date(now);
+  periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+  await db.insert(subscriptions).values({
+    orgId: org.id,
+    planId: proPlan.id,
+    status: 'trialing',
+    currentPeriodStart: now,
+    currentPeriodEnd: periodEnd,
+    trialStart: now,
+    trialEnd: trialEnd,
+  });
+  console.log('Created subscription for demo org (Professional plan, 14-day trial)');
 
   // 2. Create owner user
   const passwordHash = await authService.hashPassword('admin123');
@@ -172,15 +264,15 @@ async function seed() {
   }
   console.log('Created', templates.length, 'document templates');
 
-  // 8. Create contacts (customer + vendor)
+  // 8. Create contacts (client + vendor)
   const [customer] = await db.insert(contacts).values({
     orgId: org.id,
     fullName: 'Acme Corp',
     email: 'billing@acme.com',
     phone: '+1-555-0100',
-    contactType: 'customer',
+    type: 'client',
+    status: 'active',
     address: { street: '456 Commerce Ave', city: 'New York', state: 'NY', zip: '10002', country: 'US' },
-    isActive: true,
   }).returning();
 
   const [vendor] = await db.insert(contacts).values({
@@ -188,31 +280,29 @@ async function seed() {
     fullName: 'Freelance Design LLC',
     email: 'invoice@freelancedesign.com',
     phone: '+1-555-0200',
-    contactType: 'vendor',
-    is1099Recipient: true,
+    type: 'vendor',
+    status: 'active',
     taxId: '98-7654321',
-    taxClassification: 'llc',
     address: { street: '789 Creative St', city: 'Brooklyn', state: 'NY', zip: '11201', country: 'US' },
-    isActive: true,
   }).returning();
   console.log('Created 2 contacts');
 
   // 9. Create employee
   const [employee] = await db.insert(employees).values({
     orgId: org.id,
+    employeeId: 'EMP-001',
     firstName: 'Jane',
     lastName: 'Smith',
-    fullName: 'Jane Smith',
     email: 'jane@democompany.com',
     phone: '+1-555-0300',
     hireDate: '2023-01-15',
     status: 'active',
+    employmentType: 'full_time',
     jobTitle: 'Sales Manager',
     department: 'Sales',
     payType: 'salary',
     payRate: '75000',
     payFrequency: 'biweekly',
-    isActive: true,
   }).returning();
   console.log('Created employee:', employee.fullName);
 

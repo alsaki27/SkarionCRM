@@ -3,7 +3,7 @@ import {
   jsonb, numeric, index, uniqueIndex, inet, decimal, serial, primaryKey,
   foreignKey
 } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 
 // ============================================================================
 // ENUMERATIONS
@@ -124,6 +124,10 @@ export const organizations = pgTable('organizations', {
   timezone: varchar('timezone', { length: 50 }).default('America/New_York'),
   currency: varchar('currency', { length: 3 }).default('USD'),
   plan: varchar('plan', { length: 50 }).default('free'),
+  billingEmail: varchar('billing_email', { length: 255 }),
+  stripeCustomerId: varchar('stripe_customer_id', { length: 255 }),
+  trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
+  billingStatus: varchar('billing_status', { length: 50 }).default('active'),
   status: organizationStatusEnum('status').default('active'),
   settings: jsonb('settings').default('{}'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
@@ -155,7 +159,7 @@ export const users = pgTable('users', {
   uniqueIndex('idx_users_org_email').on(table.orgId, table.email),
   index('idx_users_org').on(table.orgId),
   index('idx_users_role').on(table.role),
-  index('idx_users_active').on(table.isActive).where(table.isActive.eq(true)),
+  index('idx_users_active').on(table.isActive).where(sql`${table.isActive} = true`),
 ]);
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -220,7 +224,7 @@ export const contacts = pgTable('contacts', {
   index('idx_contacts_name').on(table.fullName),
   index('idx_contacts_email').on(table.email),
   index('idx_contacts_assigned').on(table.assignedTo),
-  index('idx_contacts_deleted').on(table.deletedAt).where(table.deletedAt.isNull()),
+  index('idx_contacts_deleted').on(table.deletedAt).where(sql`${table.deletedAt} IS NULL`),
 ]);
 
 export const contactsRelations = relations(contacts, ({ one, many }) => ({
@@ -279,7 +283,7 @@ export const chartOfAccounts = pgTable('chart_of_accounts', {
   index('idx_coa_org').on(table.orgId),
   index('idx_coa_type').on(table.accountType),
   index('idx_coa_parent').on(table.parentId),
-  index('idx_coa_active').on(table.isActive).where(table.isActive.eq(true)),
+  index('idx_coa_active').on(table.isActive).where(sql`${table.isActive} = true`),
 ]);
 
 export const chartOfAccountsRelations = relations(chartOfAccounts, ({ one, many }) => ({
@@ -308,7 +312,7 @@ export const bankAccounts = pgTable('bank_accounts', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 }, (table) => [
   index('idx_bank_org').on(table.orgId),
-  index('idx_bank_active').on(table.isActive).where(table.isActive.eq(true)),
+  index('idx_bank_active').on(table.isActive).where(sql`${table.isActive} = true`),
 ]);
 
 export const bankAccountsRelations = relations(bankAccounts, ({ one }) => ({
@@ -342,7 +346,7 @@ export const transactions = pgTable('transactions', {
   index('idx_txn_date').on(table.transactionDate),
   index('idx_txn_contact').on(table.contactId),
   index('idx_txn_bank').on(table.bankAccountId),
-  index('idx_txn_reconciled').on(table.isReconciled).where(table.isReconciled.eq(false)),
+  index('idx_txn_reconciled').on(table.isReconciled).where(sql`${table.isReconciled} = false`),
   index('idx_txn_created').on(table.createdAt),
 ]);
 
@@ -542,7 +546,7 @@ export const complianceCategories = pgTable('compliance_categories', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 }, (table) => [
   index('idx_comp_cat_org').on(table.orgId),
-  index('idx_comp_cat_active').on(table.isActive).where(table.isActive.eq(true)),
+  index('idx_comp_cat_active').on(table.isActive).where(sql`${table.isActive} = true`),
 ]);
 
 export const complianceCategoriesRelations = relations(complianceCategories, ({ one, many }) => ({
@@ -808,7 +812,7 @@ export const documentTemplates = pgTable('document_templates', {
 }, (table) => [
   index('idx_doc_template_org').on(table.orgId),
   index('idx_doc_template_type').on(table.templateType),
-  index('idx_doc_template_active').on(table.isActive).where(table.isActive.eq(true)),
+  index('idx_doc_template_active').on(table.isActive).where(sql`${table.isActive} = true`),
 ]);
 
 export const documentTemplatesRelations = relations(documentTemplates, ({ one }) => ({
@@ -844,7 +848,7 @@ export const tasks = pgTable('tasks', {
   index('idx_task_due').on(table.dueAt),
   index('idx_task_assigned').on(table.assignedTo),
   index('idx_task_entity').on(table.entityType, table.entityId),
-  index('idx_task_overdue').on(table.dueAt).where(table.status.notInArray(['done', 'cancelled'])),
+  index('idx_task_overdue').on(table.dueAt).where(sql`${table.status} NOT IN ('done', 'cancelled')`),
 ]);
 
 export const tasksRelations = relations(tasks, ({ one }) => ({
@@ -940,7 +944,7 @@ export const invoices = pgTable('invoices', {
   index('idx_invoice_status').on(table.status),
   index('idx_invoice_due').on(table.dueDate),
   index('idx_invoice_issue').on(table.issueDate),
-  index('idx_invoice_overdue').on(table.dueDate).where(table.status.notInArray(['paid', 'cancelled', 'refunded'])),
+  index('idx_invoice_overdue').on(table.dueDate).where(sql`${table.status} NOT IN ('paid', 'cancelled', 'refunded')`),
 ]);
 
 export const invoicesRelations = relations(invoices, ({ one, many }) => ({
@@ -1036,7 +1040,7 @@ export const recurringTransactions = pgTable('recurring_transactions', {
   index('idx_recurring_org').on(table.orgId),
   index('idx_recurring_account').on(table.accountId),
   index('idx_recurring_contact').on(table.contactId),
-  index('idx_recurring_active').on(table.isActive).where(table.isActive.eq(true)),
+  index('idx_recurring_active').on(table.isActive).where(sql`${table.isActive} = true`),
   index('idx_recurring_next').on(table.nextRunDate),
   index('idx_recurring_freq').on(table.frequency),
 ]);
@@ -1189,3 +1193,376 @@ export const form1099sRelations = relations(form1099s, ({ one }) => ({
   taxYear: one(taxYears, { fields: [form1099s.taxYearId], references: [taxYears.id] }),
   corrected1099: one(form1099s, { fields: [form1099s.corrected1099Id], references: [form1099s.id] }),
 }));
+
+// ============================================================================
+// SAAS FOUNDATION TABLES
+// ============================================================================
+
+export const planIntervalEnum = pgEnum('plan_interval', [
+  'monthly', 'yearly', 'lifetime'
+]);
+
+export const subscriptionStatusEnum = pgEnum('subscription_status', [
+  'trialing', 'active', 'past_due', 'canceled', 'paused', 'incomplete'
+]);
+
+export const webhookStatusEnum = pgEnum('webhook_status', [
+  'active', 'paused', 'disabled'
+]);
+
+export const apiKeyStatusEnum = pgEnum('api_key_status', [
+  'active', 'revoked', 'expired'
+]);
+
+export const inviteStatusEnum = pgEnum('invite_status', [
+  'pending', 'accepted', 'expired', 'revoked'
+]);
+
+export const notificationTypeEnum = pgEnum('notification_type', [
+  'info', 'success', 'warning', 'error', 'mention', 'task', 'payment', 'compliance'
+]);
+
+export const notificationChannelEnum = pgEnum('notification_channel', [
+  'in_app', 'email', 'sms', 'push', 'slack'
+]);
+
+export const activityTypeEnum = pgEnum('activity_type', [
+  'login', 'logout', 'create', 'update', 'delete', 'invite', 'export', 'import',
+  'payment', 'file_upload', 'file_download', 'settings_change', 'subscription_change',
+  'invoice_sent', 'invoice_paid', 'invoice_overdue', 'payroll_run', 'tax_filed',
+  'compliance_completed', 'w2_generated', '1099_generated', 'ai_action'
+]);
+
+export const integrationTypeEnum = pgEnum('integration_type', [
+  'greenhouse', 'lever', 'workday', 'bamboohr', 'gusto', 'quickbooks', 'stripe', 'zapier', 'custom'
+]);
+
+export const integrationStatusEnum = pgEnum('integration_status', [
+  'connected', 'disconnected', 'error', 'pending_auth'
+]);
+
+// Plans
+export const plans = pgTable('plans', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: varchar('name', { length: 100 }).notNull(),
+  slug: varchar('slug', { length: 100 }).notNull().unique(),
+  description: text('description'),
+  priceMonthly: decimal('price_monthly', { precision: 10, scale: 2 }).default('0'),
+  priceYearly: decimal('price_yearly', { precision: 10, scale: 2 }).default('0'),
+  interval: planIntervalEnum('interval').default('monthly'),
+  maxUsers: integer('max_users').default(1),
+  maxContacts: integer('max_contacts').default(100),
+  maxEmployees: integer('max_employees').default(5),
+  maxInvoices: integer('max_invoices').default(50),
+  maxTransactions: integer('max_transactions').default(500),
+  maxStorageMb: integer('max_storage_mb').default(100),
+  features: jsonb('features').default('{}'), // feature flags config
+  isActive: boolean('is_active').default(true),
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});
+
+// Subscriptions
+export const subscriptions = pgTable('subscriptions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  planId: uuid('plan_id').notNull().references(() => plans.id, { onDelete: 'restrict' }),
+  status: subscriptionStatusEnum('status').default('trialing'),
+  currentPeriodStart: timestamp('current_period_start', { withTimezone: true }),
+  currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
+  trialStart: timestamp('trial_start', { withTimezone: true }),
+  trialEnd: timestamp('trial_end', { withTimezone: true }),
+  cancelAtPeriodEnd: boolean('cancel_at_period_end').default(false),
+  canceledAt: timestamp('canceled_at', { withTimezone: true }),
+  endedAt: timestamp('ended_at', { withTimezone: true }),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  uniqueIndex('idx_sub_org').on(table.orgId),
+  index('idx_sub_plan').on(table.planId),
+  index('idx_sub_status').on(table.status),
+]);
+
+export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
+  organization: one(organizations, { fields: [subscriptions.orgId], references: [organizations.id] }),
+  plan: one(plans, { fields: [subscriptions.planId], references: [plans.id] }),
+}));
+
+// Webhook Endpoints
+export const webhookEndpoints = pgTable('webhook_endpoints', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  url: text('url').notNull(),
+  secret: text('secret'), // HMAC signature secret
+  events: text('events').array().default('{}'), // ['invoice.created', 'payment.received', etc.]
+  status: webhookStatusEnum('status').default('active'),
+  lastDeliveredAt: timestamp('last_delivered_at', { withTimezone: true }),
+  lastFailureAt: timestamp('last_failure_at', { withTimezone: true }),
+  failureCount: integer('failure_count').default(0),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_webhook_org').on(table.orgId),
+  index('idx_webhook_status').on(table.status),
+]);
+
+export const webhookEndpointsRelations = relations(webhookEndpoints, ({ one }) => ({
+  organization: one(organizations, { fields: [webhookEndpoints.orgId], references: [organizations.id] }),
+}));
+
+// Webhook Events (delivery log)
+export const webhookEvents = pgTable('webhook_events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  endpointId: uuid('endpoint_id').notNull().references(() => webhookEndpoints.id, { onDelete: 'cascade' }),
+  eventType: varchar('event_type', { length: 100 }).notNull(),
+  payload: jsonb('payload').notNull(),
+  responseStatus: integer('response_status'),
+  responseBody: text('response_body'),
+  attemptCount: integer('attempt_count').default(1),
+  maxAttempts: integer('max_attempts').default(5),
+  nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
+  deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+  failedAt: timestamp('failed_at', { withTimezone: true }),
+  errorMessage: text('error_message'),
+  signature: text('signature'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_webhook_event_org').on(table.orgId),
+  index('idx_webhook_event_endpoint').on(table.endpointId),
+  index('idx_webhook_event_type').on(table.eventType),
+  index('idx_webhook_event_created').on(table.createdAt),
+]);
+
+export const webhookEventsRelations = relations(webhookEvents, ({ one }) => ({
+  organization: one(organizations, { fields: [webhookEvents.orgId], references: [organizations.id] }),
+  endpoint: one(webhookEndpoints, { fields: [webhookEvents.endpointId], references: [webhookEndpoints.id] }),
+}));
+
+// API Keys
+export const apiKeys = pgTable('api_keys', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  keyPrefix: varchar('key_prefix', { length: 10 }).notNull(), // e.g., "sk_"
+  keyHash: text('key_hash').notNull(), // bcrypt hash of the key
+  permissions: text('permissions').array().default('{}'), // ['read', 'write', 'admin']
+  rateLimit: integer('rate_limit').default(1000), // requests per hour
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  status: apiKeyStatusEnum('status').default('active'),
+  metadata: jsonb('metadata').default('{}'),
+  createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_apikey_org').on(table.orgId),
+  index('idx_apikey_status').on(table.status),
+  index('idx_apikey_prefix').on(table.keyPrefix),
+]);
+
+export const apiKeysRelations = relations(apiKeys, ({ one }) => ({
+  organization: one(organizations, { fields: [apiKeys.orgId], references: [organizations.id] }),
+  creator: one(users, { fields: [apiKeys.createdBy], references: [users.id] }),
+}));
+
+// Feature Flags
+export const featureFlags = pgTable('feature_flags', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  key: varchar('key', { length: 100 }).notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  enabled: boolean('enabled').default(false),
+  value: jsonb('value').default('{}'), // can store any config
+  rolloutPercentage: integer('rollout_percentage').default(100), // 0-100
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  uniqueIndex('idx_feature_org_key').on(table.orgId, table.key),
+  index('idx_feature_org').on(table.orgId),
+]);
+
+export const featureFlagsRelations = relations(featureFlags, ({ one }) => ({
+  organization: one(organizations, { fields: [featureFlags.orgId], references: [organizations.id] }),
+}));
+
+// Org Invites
+export const orgInvites = pgTable('org_invites', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  email: varchar('email', { length: 255 }).notNull(),
+  role: userRoleEnum('role').default('viewer'),
+  token: text('token').notNull().unique(), // secure random token
+  invitedBy: uuid('invited_by').references(() => users.id, { onDelete: 'set null' }),
+  acceptedBy: uuid('accepted_by').references(() => users.id, { onDelete: 'set null' }),
+  status: inviteStatusEnum('status').default('pending'),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  uniqueIndex('idx_invite_token').on(table.token),
+  index('idx_invite_org').on(table.orgId),
+  index('idx_invite_email').on(table.email),
+  index('idx_invite_status').on(table.status),
+]);
+
+export const orgInvitesRelations = relations(orgInvites, ({ one }) => ({
+  organization: one(organizations, { fields: [orgInvites.orgId], references: [organizations.id] }),
+  inviter: one(users, { fields: [orgInvites.invitedBy], references: [users.id] }),
+  accepter: one(users, { fields: [orgInvites.acceptedBy], references: [users.id] }),
+}));
+
+// Notifications
+export const notifications = pgTable('notifications', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  type: notificationTypeEnum('type').default('info'),
+  title: varchar('title', { length: 255 }).notNull(),
+  body: text('body'),
+  link: text('link'),
+  entityType: varchar('entity_type', { length: 50 }), // 'invoice', 'task', etc.
+  entityId: uuid('entity_id'),
+  channels: notificationChannelEnum('channels').array().default('{}'),
+  readAt: timestamp('read_at', { withTimezone: true }),
+  dismissedAt: timestamp('dismissed_at', { withTimezone: true }),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_notif_user').on(table.userId),
+  index('idx_notif_org').on(table.orgId),
+  index('idx_notif_type').on(table.type),
+  index('idx_notif_read').on(table.readAt),
+  index('idx_notif_created').on(table.createdAt),
+]);
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  organization: one(organizations, { fields: [notifications.orgId], references: [organizations.id] }),
+  user: one(users, { fields: [notifications.userId], references: [users.id] }),
+}));
+
+// Activity Logs
+export const activityLogs = pgTable('activity_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  actorName: varchar('actor_name', { length: 255 }), // denormalized for display
+  actorType: varchar('actor_type', { length: 50 }).default('user'), // 'user', 'system', 'api', 'webhook'
+  type: activityTypeEnum('type').notNull(),
+  description: text('description').notNull(),
+  entityType: varchar('entity_type', { length: 50 }),
+  entityId: uuid('entity_id'),
+  entityName: varchar('entity_name', { length: 255 }), // denormalized
+  metadata: jsonb('metadata').default('{}'),
+  ipAddress: inet('ip_address'),
+  userAgent: text('user_agent'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_activity_org').on(table.orgId),
+  index('idx_activity_user').on(table.userId),
+  index('idx_activity_type').on(table.type),
+  index('idx_activity_entity').on(table.entityType, table.entityId),
+  index('idx_activity_created').on(table.createdAt),
+]);
+
+export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
+  organization: one(organizations, { fields: [activityLogs.orgId], references: [organizations.id] }),
+  user: one(users, { fields: [activityLogs.userId], references: [users.id] }),
+}));
+
+// Integrations (ATS, accounting, etc.)
+export const integrations = pgTable('integrations', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  type: integrationTypeEnum('type').notNull(),
+  status: integrationStatusEnum('status').default('pending_auth'),
+  credentials: jsonb('credentials').default('{}'), // encrypted token storage
+  config: jsonb('config').default('{}'), // user preferences
+  lastSyncAt: timestamp('last_sync_at', { withTimezone: true }),
+  lastSyncStatus: varchar('last_sync_status', { length: 50 }),
+  lastSyncError: text('last_sync_error'),
+  syncFrequency: varchar('sync_frequency', { length: 50 }).default('daily'), // manual, hourly, daily, realtime
+  metadata: jsonb('metadata').default('{}'),
+  isActive: boolean('is_active').default(true),
+  createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_integration_org').on(table.orgId),
+  index('idx_integration_type').on(table.type),
+  index('idx_integration_status').on(table.status),
+  uniqueIndex('idx_integration_org_type').on(table.orgId, table.type),
+]);
+
+export const integrationsRelations = relations(integrations, ({ one }) => ({
+  organization: one(organizations, { fields: [integrations.orgId], references: [organizations.id] }),
+  creator: one(users, { fields: [integrations.createdBy], references: [users.id] }),
+}));
+
+// Import Jobs (for CSV/ATS bulk imports)
+export const importJobs = pgTable('import_jobs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  sourceType: varchar('source_type', { length: 50 }).notNull(), // 'csv', 'greenhouse', 'lever', 'api'
+  entityType: varchar('entity_type', { length: 50 }).notNull(), // 'contacts', 'employees', 'transactions'
+  filePath: text('file_path'), // for CSV uploads
+  rawData: jsonb('raw_data').default('{}'), // preview of parsed data
+  mappedFields: jsonb('mapped_fields').default('{}'), // column mappings
+  status: varchar('status', { length: 50 }).default('pending'), // pending, processing, completed, failed, cancelled
+  totalRows: integer('total_rows').default(0),
+  processedRows: integer('processed_rows').default(0),
+  successRows: integer('success_rows').default(0),
+  errorRows: integer('error_rows').default(0),
+  errors: jsonb('errors').default('[]'), // array of error details
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_import_org').on(table.orgId),
+  index('idx_import_status').on(table.status),
+  index('idx_import_type').on(table.entityType),
+]);
+
+export const importJobsRelations = relations(importJobs, ({ one }) => ({
+  organization: one(organizations, { fields: [importJobs.orgId], references: [organizations.id] }),
+  creator: one(users, { fields: [importJobs.createdBy], references: [users.id] }),
+}));
+
+// AI Prompts / Conversations
+export const aiConversations = pgTable('ai_conversations', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  title: varchar('title', { length: 255 }).notNull(),
+  model: varchar('model', { length: 100 }).default('gpt-4o'),
+  messages: jsonb('messages').default('[]'), // array of {role, content, timestamp}
+  summary: text('summary'), // AI-generated summary
+  tokensUsed: integer('tokens_used').default(0),
+  costEstimate: decimal('cost_estimate', { precision: 10, scale: 4 }).default('0'),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_ai_conv_org').on(table.orgId),
+  index('idx_ai_conv_user').on(table.userId),
+  index('idx_ai_conv_created').on(table.createdAt),
+]);
+
+export const aiConversationsRelations = relations(aiConversations, ({ one }) => ({
+  organization: one(organizations, { fields: [aiConversations.orgId], references: [organizations.id] }),
+  user: one(users, { fields: [aiConversations.userId], references: [users.id] }),
+}));
+
