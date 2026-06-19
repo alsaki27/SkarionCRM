@@ -1,6 +1,12 @@
 import { CronJob } from 'cron';
 import { db } from '../db/index.js';
-import { recurringTransactions, transactions } from '../db/schema.js';
+import {
+  complianceItems,
+  recurringTransactions,
+  tasks,
+  taxForms,
+  transactions,
+} from '../db/schema.js';
 import { eq, and, lte, gte, notInArray } from 'drizzle-orm';
 
 export function initializeCronJobs() {
@@ -30,14 +36,14 @@ export function initializeCronJobs() {
     console.log('[CRON] Checking tax deadlines...');
     const now = new Date();
     const sevenDays = new Date(now); sevenDays.setDate(now.getDate() + 7);
-    const threeDays = new Date(now); threeDays.setDate(now.getDate() + 3);
-    const oneDay = new Date(now); oneDay.setDate(now.getDate() + 1);
+    const today = now.toISOString().split('T')[0];
+    const sevenDaysOut = sevenDays.toISOString().split('T')[0];
     
     const upcomingForms = await db.query.taxForms.findMany({
       where: and(
         eq(taxForms.status, 'draft'),
-        lte(taxForms.filingDeadline, sevenDays),
-        gte(taxForms.filingDeadline, now)
+        lte(taxForms.filingDeadline, sevenDaysOut),
+        gte(taxForms.filingDeadline, today)
       ),
     });
     
@@ -49,12 +55,14 @@ export function initializeCronJobs() {
     console.log('[CRON] Checking compliance deadlines...');
     const now = new Date();
     const sevenDays = new Date(now); sevenDays.setDate(now.getDate() + 7);
+    const today = now.toISOString().split('T')[0];
+    const sevenDaysOut = sevenDays.toISOString().split('T')[0];
     
     const upcomingItems = await db.query.complianceItems.findMany({
       where: and(
         notInArray(complianceItems.status, ['compliant', 'overdue']),
-        lte(complianceItems.dueDate, sevenDays),
-        gte(complianceItems.dueDate, now)
+        lte(complianceItems.dueDate, sevenDaysOut),
+        gte(complianceItems.dueDate, today)
       ),
     });
     

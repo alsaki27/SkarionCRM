@@ -1,7 +1,7 @@
 import {
   pgTable, pgEnum, uuid, varchar, integer, boolean, timestamp, text, date, time,
   jsonb, numeric, index, uniqueIndex, inet, decimal, serial, primaryKey,
-  foreignKey
+  foreignKey, AnyPgColumn
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 
@@ -210,7 +210,7 @@ export const contacts = pgTable('contacts', {
   companyName: varchar('company_name', { length: 255 }),
   taxId: varchar('tax_id', { length: 50 }),
   address: jsonb('address').default('{}'),
-  tags: text('tags').array().default('{}'),
+  tags: text('tags').array().default([]),
   notes: text('notes'),
   lastContactedAt: timestamp('last_contacted_at', { withTimezone: true }),
   assignedTo: uuid('assigned_to').references(() => users.id, { onDelete: 'set null' }),
@@ -270,7 +270,7 @@ export const chartOfAccounts = pgTable('chart_of_accounts', {
   name: varchar('name', { length: 255 }).notNull(),
   accountType: accountTypeEnum('account_type').notNull(),
   accountSubtype: varchar('account_subtype', { length: 100 }),
-  parentId: uuid('parent_id').references(() => chartOfAccounts.id, { onDelete: 'set null' }),
+  parentId: uuid('parent_id').references((): AnyPgColumn => chartOfAccounts.id, { onDelete: 'set null' }),
   level: integer('level').default(1),
   isBankAccount: boolean('is_bank_account').default(false),
   bankAccountId: uuid('bank_account_id'),
@@ -367,7 +367,7 @@ export const journalEntries = pgTable('journal_entries', {
   description: text('description'),
   status: journalEntryStatusEnum('status').default('draft'),
   isReversingEntry: boolean('is_reversing_entry').default(false),
-  reversedEntryId: uuid('reversed_entry_id').references(() => journalEntries.id, { onDelete: 'set null' }),
+  reversedEntryId: uuid('reversed_entry_id').references((): AnyPgColumn => journalEntries.id, { onDelete: 'set null' }),
   totalDebit: decimal('total_debit', { precision: 15, scale: 2 }).notNull(),
   totalCredit: decimal('total_credit', { precision: 15, scale: 2 }).notNull(),
   postedAt: timestamp('posted_at', { withTimezone: true }),
@@ -450,7 +450,7 @@ export const taxYears = pgTable('tax_years', {
   startDate: date('start_date').notNull(),
   endDate: date('end_date').notNull(),
   status: taxYearStatusEnum('status').default('open'),
-  formTypes: text('form_types').array().default('{}'),
+  formTypes: text('form_types').array().default([]),
   extensionFiled: boolean('extension_filed').default(false),
   extensionDeadline: date('extension_deadline'),
   filedDate: date('filed_date'),
@@ -750,7 +750,7 @@ export const w2Forms = pgTable('w2_forms', {
   irsFiledAt: timestamp('irs_filed_at', { withTimezone: true }),
   ssaFiledAt: timestamp('ssa_filed_at', { withTimezone: true }),
   generatedPdfPath: text('generated_pdf_path'),
-  correctedW2Id: uuid('corrected_w2_id').references(() => w2Forms.id, { onDelete: 'set null' }),
+  correctedW2Id: uuid('corrected_w2_id').references((): AnyPgColumn => w2Forms.id, { onDelete: 'set null' }),
   metadata: jsonb('metadata').default('{}'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
@@ -1169,7 +1169,7 @@ export const form1099s = pgTable('form_1099s', {
   // Box 16 — State/Payer's state number
   stateInfo: jsonb('state_info').default('[]'),
   // Corrected form
-  corrected1099Id: uuid('corrected_1099_id').references(() => form1099s.id, { onDelete: 'set null' }),
+  corrected1099Id: uuid('corrected_1099_id').references((): AnyPgColumn => form1099s.id, { onDelete: 'set null' }),
   // Distribution & filing
   copyDistributedAt: timestamp('copy_distributed_at', { withTimezone: true }),
   irsFiledAt: timestamp('irs_filed_at', { withTimezone: true }),
@@ -1299,7 +1299,7 @@ export const webhookEndpoints = pgTable('webhook_endpoints', {
   name: varchar('name', { length: 255 }).notNull(),
   url: text('url').notNull(),
   secret: text('secret'), // HMAC signature secret
-  events: text('events').array().default('{}'), // ['invoice.created', 'payment.received', etc.]
+  events: text('events').array().default([]), // ['invoice.created', 'payment.received', etc.]
   status: webhookStatusEnum('status').default('active'),
   lastDeliveredAt: timestamp('last_delivered_at', { withTimezone: true }),
   lastFailureAt: timestamp('last_failure_at', { withTimezone: true }),
@@ -1352,7 +1352,7 @@ export const apiKeys = pgTable('api_keys', {
   name: varchar('name', { length: 255 }).notNull(),
   keyPrefix: varchar('key_prefix', { length: 10 }).notNull(), // e.g., "sk_"
   keyHash: text('key_hash').notNull(), // bcrypt hash of the key
-  permissions: text('permissions').array().default('{}'), // ['read', 'write', 'admin']
+  permissions: text('permissions').array().default([]), // ['read', 'write', 'admin']
   rateLimit: integer('rate_limit').default(1000), // requests per hour
   expiresAt: timestamp('expires_at', { withTimezone: true }),
   lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
@@ -1433,7 +1433,7 @@ export const notifications = pgTable('notifications', {
   link: text('link'),
   entityType: varchar('entity_type', { length: 50 }), // 'invoice', 'task', etc.
   entityId: uuid('entity_id'),
-  channels: notificationChannelEnum('channels').array().default('{}'),
+  channels: notificationChannelEnum('channels').array().default([]),
   readAt: timestamp('read_at', { withTimezone: true }),
   dismissedAt: timestamp('dismissed_at', { withTimezone: true }),
   metadata: jsonb('metadata').default('{}'),
@@ -1608,7 +1608,7 @@ export const workSchedules = pgTable('work_schedules', {
   shiftStart: time('shift_start').notNull(), // e.g., "09:00"
   shiftEnd: time('shift_end').notNull(), // e.g., "17:00"
   breakDurationMinutes: integer('break_duration_minutes').default(60),
-  workingDays: text('working_days').array().default('{}'), // ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+  workingDays: text('working_days').array().default([]), // ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
   overtimeThresholdDaily: decimal('overtime_threshold_daily', { precision: 5, scale: 2 }).default('8.00'), // hours
   overtimeThresholdWeekly: decimal('overtime_threshold_weekly', { precision: 5, scale: 2 }).default('40.00'), // hours
   gracePeriodMinutes: integer('grace_period_minutes').default(5),
@@ -1794,7 +1794,7 @@ export const projectTasks = pgTable('project_tasks', {
   id: uuid('id').defaultRandom().primaryKey(),
   orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
-  parentTaskId: uuid('parent_task_id').references(() => projectTasks.id, { onDelete: 'set null' }),
+  parentTaskId: uuid('parent_task_id').references((): AnyPgColumn => projectTasks.id, { onDelete: 'set null' }),
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
   estimatedHours: decimal('estimated_hours', { precision: 10, scale: 2 }),

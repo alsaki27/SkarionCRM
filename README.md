@@ -211,6 +211,14 @@ Use the demo credentials:
 - **Email**: `admin@democompany.com`
 - **Password**: `admin123`
 
+### Current Validation Status
+
+As of the latest audit, `npm run build` completes successfully for both the server and client. The server build emits with `tsc --noCheck` because existing routers still have broad Drizzle/type drift that needs a dedicated cleanup pass.
+
+`npm run lint` is configured for ESLint 9 and currently passes with warnings. `npm run test --workspace=server` starts correctly but requires a configured `DATABASE_URL` test database. `npm run typecheck --workspace=server` and `npm run typecheck --workspace=client` still fail and should be treated as blocking before production hardening.
+
+See `IMPLEMENTATION_AUDIT.md` for detailed findings and remaining work.
+
 ---
 
 ## API Structure

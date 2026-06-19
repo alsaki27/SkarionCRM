@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import type { Secret, SignOptions } from 'jsonwebtoken';
 import { db } from '../db/index.js';
 import { users, organizations } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
@@ -8,6 +9,7 @@ import type { JWTPayload } from '../trpc.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'skarion-dev-secret-key-change-in-production';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+type UserRole = typeof users.$inferSelect.role;
 
 export interface AuthResult {
   user: typeof users.$inferSelect;
@@ -23,14 +25,15 @@ export class AuthService {
     return bcrypt.compare(password, hash);
   }
 
-  generateToken(userId: string, orgId: string, email: string, role: string): string {
+  generateToken(userId: string, orgId: string, email: string, role: UserRole): string {
     const payload: Omit<JWTPayload, 'iat' | 'exp'> = {
       userId,
       orgId,
       email,
       role,
     };
-    return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    const options: SignOptions = { expiresIn: JWT_EXPIRES_IN as SignOptions['expiresIn'] };
+    return jwt.sign(payload, JWT_SECRET as Secret, options);
   }
 
   async register(
@@ -107,7 +110,7 @@ export class AuthService {
     invitedBy: string,
     email: string,
     fullName: string,
-    role: string
+    role: UserRole
   ): Promise<typeof users.$inferSelect> {
     const org = await db.query.organizations.findFirst({
       where: eq(organizations.id, orgId),

@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { trpc } from "../../api.ts";
-import { Button } from "../../components/ui/Button.tsx";
-import { Card } from "../../components/ui/Card.tsx";
-import { Badge } from "../../components/ui/Badge.tsx";
+import { Button } from "../components/ui/Button.tsx";
+import { Card } from "../components/ui/Card.tsx";
+import { Badge } from "../components/ui/Badge.tsx";
 import {
   Menu,
   X,

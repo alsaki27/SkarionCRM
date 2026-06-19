@@ -3,6 +3,7 @@
   "version": "2.0.0",
   "description": "Skarion CRM - One-Stop Financial Recordkeeping, Taxation, Compliance & W2 Solution",
   "private": true,
+  "type": "module",
   "workspaces": [
     "server",
     "client",

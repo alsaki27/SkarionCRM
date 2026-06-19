@@ -214,7 +214,7 @@ export async function analyzeTransactionsWithAI(
     transactionType: r.transactions.transactionType,
     transactionDate: r.transactions.transactionDate,
     debitCredit: r.transactions.debitCredit,
-    account: r.chartOfAccounts?.name ?? null,
+    account: r.chart_of_accounts?.name ?? null,
     contact: r.contacts?.fullName ?? null,
     isReconciled: r.transactions.isReconciled,
   }));
