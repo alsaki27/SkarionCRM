@@ -407,7 +407,7 @@ export default function TeamMembers(): React.ReactElement {
             <Button variant="secondary" onClick={() => setShowInviteModal(false)}>
               Cancel
             </Button>
-            <Button onClick={handleInvite} loading={inviteMutation.isLoading}>
+            <Button onClick={handleInvite} loading={inviteMutation.isPending}>
               <Mail size={16} className="mr-2" />
               Send Invite
             </Button>

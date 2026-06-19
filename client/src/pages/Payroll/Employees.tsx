@@ -292,7 +292,7 @@ export default function Employees(): React.ReactElement {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleTerminate(row.id)}
-                        loading={terminateMutation.isLoading && terminateMutation.variables?.id === row.id}
+                        loading={terminateMutation.isPending && terminateMutation.variables?.id === row.id}
                         title="Terminate"
                       >
                         <UserX size={16} className="text-red-500" />

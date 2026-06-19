@@ -187,7 +187,7 @@ export default function TaxForms(): React.ReactElement {
         footer={
           <>
             <Button variant="secondary" onClick={() => { setEditModalOpen(false); setEditForm(null); }}>Cancel</Button>
-            <Button loading={updateMutation.isLoading} onClick={handleUpdate}>
+            <Button loading={updateMutation.isPending} onClick={handleUpdate}>
               <Save size={16} className="mr-1" />
               Save
             </Button>

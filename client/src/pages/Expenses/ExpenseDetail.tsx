@@ -222,7 +222,7 @@ export default function ExpenseDetail(): React.ReactElement {
         </div>
         <div className="flex items-center gap-2">
           {status === 'draft' && (
-            <Button onClick={() => submitMutation.mutate({ id: report.id })} loading={submitMutation.isLoading}>
+            <Button onClick={() => submitMutation.mutate({ id: report.id })} loading={submitMutation.isPending}>
               <Send size={16} className="mr-1" />
               Submit
             </Button>
@@ -232,7 +232,7 @@ export default function ExpenseDetail(): React.ReactElement {
               <Button
                 variant="secondary"
                 onClick={() => reviewMutation.mutate({ id: report.id, approve: true })}
-                loading={reviewMutation.isLoading}
+                loading={reviewMutation.isPending}
               >
                 <CheckCircle size={16} className="mr-1" />
                 Approve
@@ -250,7 +250,7 @@ export default function ExpenseDetail(): React.ReactElement {
             <>
               <Button
                 onClick={() => approveMutation.mutate({ id: report.id })}
-                loading={approveMutation.isLoading}
+                loading={approveMutation.isPending}
               >
                 <CheckCircle size={16} className="mr-1" />
                 Approve
@@ -392,7 +392,7 @@ export default function ExpenseDetail(): React.ReactElement {
               Cancel
             </Button>
             <Button
-              loading={reimburseMutation.isLoading}
+              loading={reimburseMutation.isPending}
               onClick={() => {
                 if (!reimburseAmount || parseFloat(reimburseAmount) <= 0) {
                   addToast('error', 'Please enter a valid amount');
@@ -434,7 +434,7 @@ export default function ExpenseDetail(): React.ReactElement {
             </Button>
             <Button
               variant="danger"
-              loading={rejectMutation.isLoading}
+              loading={rejectMutation.isPending}
               onClick={() => {
                 if (!rejectReason.trim()) {
                   addToast('error', 'Please provide a rejection reason');

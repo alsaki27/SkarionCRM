@@ -255,7 +255,7 @@ export default function ApiKeys(): React.ReactElement {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleRevoke(row.id)}
-                        loading={revokeMutation.isLoading && revokeMutation.variables?.id === row.id}
+                        loading={revokeMutation.isPending && revokeMutation.variables?.id === row.id}
                         title="Revoke"
                       >
                         <Ban size={16} className="text-amber-500" />
@@ -265,7 +265,7 @@ export default function ApiKeys(): React.ReactElement {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDelete(row.id)}
-                      loading={deleteMutation.isLoading && deleteMutation.variables?.id === row.id}
+                      loading={deleteMutation.isPending && deleteMutation.variables?.id === row.id}
                       title="Delete"
                     >
                       <Trash2 size={16} className="text-red-500" />
@@ -290,7 +290,7 @@ export default function ApiKeys(): React.ReactElement {
             <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreate} loading={createMutation.isLoading}>
+            <Button onClick={handleCreate} loading={createMutation.isPending}>
               <Key size={16} className="mr-2" />
               Create Key
             </Button>

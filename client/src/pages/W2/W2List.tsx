@@ -252,7 +252,7 @@ export default function W2List(): React.ReactElement {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDistribute(row.id)}
-                        loading={distributeMutation.isLoading && distributeMutation.variables?.id === row.id}
+                        loading={distributeMutation.isPending && distributeMutation.variables?.id === row.id}
                         title="Distribute"
                       >
                         <Send size={16} className="text-blue-500" />
@@ -263,7 +263,7 @@ export default function W2List(): React.ReactElement {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleFile(row.id)}
-                        loading={fileMutation.isLoading && fileMutation.variables?.id === row.id}
+                        loading={fileMutation.isPending && fileMutation.variables?.id === row.id}
                         title="File"
                       >
                         <FileCheck size={16} className="text-green-600" />

@@ -216,7 +216,7 @@ export default function PayrollRunForm(): React.ReactElement {
             <Button variant="secondary" type="button" onClick={() => navigate('/payroll/runs')}>
               Cancel
             </Button>
-            <Button type="submit" loading={createRunMutation.isLoading}>
+            <Button type="submit" loading={createRunMutation.isPending}>
               <Save size={16} className="mr-2" />
               Create Run & Add Entries
             </Button>
@@ -344,7 +344,7 @@ export default function PayrollRunForm(): React.ReactElement {
             <Button
               variant="outline"
               onClick={saveAllEntries}
-              loading={addEntryMutation.isLoading}
+              loading={addEntryMutation.isPending}
               disabled={entries.length === 0}
             >
               <Save size={16} className="mr-2" />
@@ -352,7 +352,7 @@ export default function PayrollRunForm(): React.ReactElement {
             </Button>
             <Button
               onClick={handleProcess}
-              loading={processMutation.isLoading}
+              loading={processMutation.isPending}
               disabled={entries.length === 0}
             >
               <Play size={16} className="mr-2" />

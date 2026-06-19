@@ -271,7 +271,7 @@ export default function Integrations(): React.ReactElement {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleSync(integration!.id)}
-                        loading={syncMutation.isLoading && syncMutation.variables?.id === integration!.id}
+                        loading={syncMutation.isPending && syncMutation.variables?.id === integration!.id}
                         title="Sync now"
                       >
                         <RefreshCw size={16} className="text-blue-500" />
@@ -312,7 +312,7 @@ export default function Integrations(): React.ReactElement {
                         size="sm"
                         className="w-full"
                         onClick={() => handleDisconnect(integration!.id)}
-                        loading={deleteMutation.isLoading && deleteMutation.variables?.id === integration!.id}
+                        loading={deleteMutation.isPending && deleteMutation.variables?.id === integration!.id}
                       >
                         <Unlink size={14} className="mr-2" />
                         Disconnect
@@ -368,7 +368,7 @@ export default function Integrations(): React.ReactElement {
             </Button>
             <Button
               onClick={handleConnect}
-              loading={createMutation.isLoading || updateMutation.isLoading}
+              loading={createMutation.isPending || updateMutation.isPending}
             >
               <Check size={16} className="mr-2" />
               {configuringIntegration ? 'Save Changes' : 'Connect'}

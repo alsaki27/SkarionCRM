@@ -286,7 +286,7 @@ export default function ComplianceItems(): React.ReactElement {
         footer={
           <>
             <Button variant="secondary" onClick={() => { setModalOpen(false); setEditItem(null); }}>Cancel</Button>
-            <Button loading={createMutation.isLoading || updateMutation.isLoading} onClick={handleSubmit}>
+            <Button loading={createMutation.isPending || updateMutation.isPending} onClick={handleSubmit}>
               {editItem ? 'Update' : 'Create'}
             </Button>
           </>
@@ -390,7 +390,7 @@ export default function ComplianceItems(): React.ReactElement {
         footer={
           <>
             <Button variant="secondary" onClick={() => { setDeleteModalOpen(false); setItemToDelete(null); }}>Cancel</Button>
-            <Button variant="danger" loading={deleteMutation.isLoading} onClick={confirmDelete}>Delete</Button>
+            <Button variant="danger" loading={deleteMutation.isPending} onClick={confirmDelete}>Delete</Button>
           </>
         }
       >

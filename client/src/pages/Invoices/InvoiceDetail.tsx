@@ -108,22 +108,22 @@ const InvoiceDetail: React.FC = () => {
   );
 
   const { data: accounts } = trpc.financial.listAccounts.useQuery();
-  const utils = trpc.useContext();
+  const utils = trpc.useUtils();
 
   const updateMutation = trpc.invoice.updateInvoice.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Invoice updated successfully' });
+      addToast('success', 'Invoice updated successfully');
       utils.invoice.getInvoiceById.invalidate({ id: id! });
       utils.invoice.listInvoices.invalidate();
     },
     onError: (err) => {
-      addToast({ type: 'error', message: err.message || 'Failed to update invoice' });
+      addToast('error', err.message || 'Failed to update invoice');
     },
   });
 
   const recordPaymentMutation = trpc.invoice.recordPayment.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Payment recorded successfully' });
+      addToast('success', 'Payment recorded successfully');
       setShowPaymentModal(false);
       setPaymentForm({
         amount: '',
@@ -137,19 +137,19 @@ const InvoiceDetail: React.FC = () => {
       utils.invoice.listInvoices.invalidate();
     },
     onError: (err) => {
-      addToast({ type: 'error', message: err.message || 'Failed to record payment' });
+      addToast('error', err.message || 'Failed to record payment');
     },
   });
 
   const deletePaymentMutation = trpc.invoice.deletePayment.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Payment deleted successfully' });
+      addToast('success', 'Payment deleted successfully');
       utils.invoice.getInvoiceById.invalidate({ id: id! });
       utils.invoice.listInvoices.invalidate();
       setDeletePaymentId(null);
     },
     onError: (err) => {
-      addToast({ type: 'error', message: err.message || 'Failed to delete payment' });
+      addToast('error', err.message || 'Failed to delete payment');
     },
   });
 
@@ -218,7 +218,7 @@ const InvoiceDetail: React.FC = () => {
         </div>
         <div className="flex items-center gap-3">
           {inv.status === 'draft' && (
-            <Button variant="outline" onClick={handleSend} loading={updateMutation.isLoading}>
+            <Button variant="outline" onClick={handleSend} loading={updateMutation.isPending}>
               <Send className="w-4 h-4 mr-2" />
               Send
             </Button>
@@ -386,7 +386,7 @@ const InvoiceDetail: React.FC = () => {
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="outline" onClick={() => setShowPaymentModal(false)}>Cancel</Button>
-            <Button onClick={handleRecordPayment} loading={recordPaymentMutation.isLoading}>
+            <Button onClick={handleRecordPayment} loading={recordPaymentMutation.isPending}>
               <Calendar className="w-4 h-4 mr-2" />
               Record Payment
             </Button>
@@ -399,7 +399,7 @@ const InvoiceDetail: React.FC = () => {
           <p className="text-gray-700">Are you sure you want to delete this payment? This action cannot be undone.</p>
           <div className="flex justify-end gap-3">
             <Button variant="outline" onClick={() => setDeletePaymentId(null)}>Cancel</Button>
-            <Button variant="danger" onClick={() => deletePaymentId && deletePaymentMutation.mutate({ id: deletePaymentId })} loading={deletePaymentMutation.isLoading}>
+            <Button variant="danger" onClick={() => deletePaymentId && deletePaymentMutation.mutate({ id: deletePaymentId })} loading={deletePaymentMutation.isPending}>
               Delete
             </Button>
           </div>

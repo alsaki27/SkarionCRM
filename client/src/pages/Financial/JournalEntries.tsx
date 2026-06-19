@@ -245,7 +245,7 @@ export default function JournalEntries(): React.ReactElement {
         footer={
           <>
             <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
-            <Button loading={createMutation.isLoading} onClick={handleSubmit} disabled={!isBalanced}>
+            <Button loading={createMutation.isPending} onClick={handleSubmit} disabled={!isBalanced}>
               Save Entry
             </Button>
           </>

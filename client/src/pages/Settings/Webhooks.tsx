@@ -277,7 +277,7 @@ export default function Webhooks(): React.ReactElement {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDelete(row.id)}
-                      loading={deleteMutation.isLoading && deleteMutation.variables?.id === row.id}
+                      loading={deleteMutation.isPending && deleteMutation.variables?.id === row.id}
                       title="Delete"
                     >
                       <Trash2 size={16} className="text-red-500" />
@@ -387,7 +387,7 @@ export default function Webhooks(): React.ReactElement {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleRetry(row.id)}
-                            loading={retryMutation.isLoading && retryMutation.variables?.eventId === row.id}
+                            loading={retryMutation.isPending && retryMutation.variables?.eventId === row.id}
                             title="Retry"
                           >
                             <RefreshCw size={16} className="text-blue-500" />
@@ -415,7 +415,7 @@ export default function Webhooks(): React.ReactElement {
             <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreate} loading={createMutation.isLoading}>
+            <Button onClick={handleCreate} loading={createMutation.isPending}>
               <Check size={16} className="mr-2" />
               Add Endpoint
             </Button>

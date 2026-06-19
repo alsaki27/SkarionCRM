@@ -111,51 +111,51 @@ export default function ProjectSetup(): React.ReactElement {
 
   const createProject = trpc.projects.createProject.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Project created successfully' });
+      addToast('success', 'Project created successfully');
       projectsQuery.refetch();
       closeProjectModal();
     },
-    onError: (err) => addToast({ type: 'error', message: err.message || 'Failed to create project' }),
+    onError: (err) => addToast('error', err.message || 'Failed to create project'),
   });
   const updateProject = trpc.projects.updateProject.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Project updated successfully' });
+      addToast('success', 'Project updated successfully');
       projectsQuery.refetch();
       closeProjectModal();
     },
-    onError: (err) => addToast({ type: 'error', message: err.message || 'Failed to update project' }),
+    onError: (err) => addToast('error', err.message || 'Failed to update project'),
   });
   const deleteProject = trpc.projects.deleteProject.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Project deleted' });
+      addToast('success', 'Project deleted');
       projectsQuery.refetch();
       if (activeProjectId) setActiveProjectId(null);
     },
-    onError: (err) => addToast({ type: 'error', message: err.message || 'Failed to delete project' }),
+    onError: (err) => addToast('error', err.message || 'Failed to delete project'),
   });
 
   const createTask = trpc.projects.createTask.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Task created successfully' });
+      addToast('success', 'Task created successfully');
       tasksQuery.refetch();
       closeTaskModal();
     },
-    onError: (err) => addToast({ type: 'error', message: err.message || 'Failed to create task' }),
+    onError: (err) => addToast('error', err.message || 'Failed to create task'),
   });
   const updateTask = trpc.projects.updateTask.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Task updated successfully' });
+      addToast('success', 'Task updated successfully');
       tasksQuery.refetch();
       closeTaskModal();
     },
-    onError: (err) => addToast({ type: 'error', message: err.message || 'Failed to update task' }),
+    onError: (err) => addToast('error', err.message || 'Failed to update task'),
   });
   const deleteTask = trpc.projects.deleteTask.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Task deleted' });
+      addToast('success', 'Task deleted');
       tasksQuery.refetch();
     },
-    onError: (err) => addToast({ type: 'error', message: err.message || 'Failed to delete task' }),
+    onError: (err) => addToast('error', err.message || 'Failed to delete task'),
   });
 
   const projects = (projectsQuery.data?.items ?? []) as Project[];
@@ -224,7 +224,7 @@ export default function ProjectSetup(): React.ReactElement {
   const handleProjectSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectForm.name.trim()) {
-      addToast({ type: 'error', message: 'Project name is required' });
+      addToast('error', 'Project name is required');
       return;
     }
     const payload = {
@@ -247,7 +247,7 @@ export default function ProjectSetup(): React.ReactElement {
   const handleTaskSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!taskForm.name.trim() || !activeProjectId) {
-      addToast({ type: 'error', message: 'Task name is required' });
+      addToast('error', 'Task name is required');
       return;
     }
     const payload = {

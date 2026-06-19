@@ -85,15 +85,15 @@ const InvoiceList: React.FC = () => {
     enabled: showAging,
   });
 
-  const utils = trpc.useContext();
+  const utils = trpc.useUtils();
   const deleteMutation = trpc.invoice.deleteInvoice.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Invoice deleted successfully' });
+      addToast('success', 'Invoice deleted successfully');
       utils.invoice.listInvoices.invalidate();
       setDeleteId(null);
     },
     onError: (err) => {
-      addToast({ type: 'error', message: err.message || 'Failed to delete invoice' });
+      addToast('error', err.message || 'Failed to delete invoice');
     },
   });
 
@@ -254,7 +254,7 @@ const InvoiceList: React.FC = () => {
           <p className="text-gray-700">Are you sure you want to delete this invoice? This action cannot be undone.</p>
           <div className="flex justify-end gap-3">
             <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
-            <Button variant="danger" onClick={confirmDelete} loading={deleteMutation.isLoading}>Delete</Button>
+            <Button variant="danger" onClick={confirmDelete} loading={deleteMutation.isPending}>Delete</Button>
           </div>
         </div>
       </Modal>

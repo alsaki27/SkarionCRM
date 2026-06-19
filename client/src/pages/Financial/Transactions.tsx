@@ -207,7 +207,7 @@ export default function Transactions(): React.ReactElement {
         footer={
           <>
             <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
-            <Button loading={createMutation.isLoading} onClick={handleSubmit}>Save</Button>
+            <Button loading={createMutation.isPending} onClick={handleSubmit}>Save</Button>
           </>
         }
       >

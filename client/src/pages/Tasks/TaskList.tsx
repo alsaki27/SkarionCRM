@@ -379,7 +379,7 @@ export default function TaskList(): React.ReactElement {
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onSubmit={(data) => createMutation.mutate(data)}
-        loading={createMutation.isLoading}
+        loading={createMutation.isPending}
         users={users}
       />
     </div>

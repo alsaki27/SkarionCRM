@@ -72,7 +72,7 @@ export default function MyProjects(): React.ReactElement {
     limit: 20,
     offset: 0,
   });
-  const utils = trpc.useContext();
+  const utils = trpc.useUtils();
 
   const createEntryMutation = trpc.projects.createProjectTimeEntry.useMutation({
     onSuccess: () => {
@@ -338,7 +338,7 @@ export default function MyProjects(): React.ReactElement {
             <Button
               variant="primary"
               onClick={handleLogSubmit}
-              loading={createEntryMutation.isLoading}
+              loading={createEntryMutation.isPending}
               className="gap-1"
             >
               <Plus size={16} />

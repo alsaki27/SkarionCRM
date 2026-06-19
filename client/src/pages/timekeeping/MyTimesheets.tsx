@@ -66,7 +66,7 @@ export default function MyTimesheets(): React.ReactElement {
     status: statusFilter === 'all' ? undefined : statusFilter,
   });
 
-  const utils = trpc.useContext();
+  const utils = trpc.useUtils();
   const submitMutation = trpc.timekeeping.submitTimesheet.useMutation({
     onSuccess: () => {
       addToast('success', 'Timesheet submitted successfully');
@@ -168,7 +168,7 @@ export default function MyTimesheets(): React.ReactElement {
               variant="primary"
               size="sm"
               onClick={() => handleSubmit(row.id)}
-              loading={submitMutation.isLoading}
+              loading={submitMutation.isPending}
               className="gap-1"
             >
               <Send size={14} />
@@ -280,7 +280,7 @@ export default function MyTimesheets(): React.ReactElement {
                           variant="primary"
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); handleSubmit(ts.id); }}
-                          loading={submitMutation.isLoading}
+                          loading={submitMutation.isPending}
                           className="gap-1"
                         >
                           <Send size={14} />
@@ -435,7 +435,7 @@ export default function MyTimesheets(): React.ReactElement {
                 handleSubmit(selectedTimesheet.id);
                 setViewModalOpen(false);
               }}
-              loading={submitMutation.isLoading}
+              loading={submitMutation.isPending}
               className="gap-1"
             >
               <Send size={14} />

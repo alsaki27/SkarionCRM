@@ -69,35 +69,35 @@ export default function HolidayCalendar(): React.ReactElement {
   const query = trpc.pto.listHolidays.useQuery(queryParams);
   const createMutation = trpc.pto.createHoliday.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Holiday added successfully' });
+      addToast('success', 'Holiday added successfully');
       query.refetch();
       handleCloseModal();
     },
-    onError: (err) => addToast({ type: 'error', message: err.message || 'Failed to add holiday' }),
+    onError: (err) => addToast('error', err.message || 'Failed to add holiday'),
   });
   const updateMutation = trpc.pto.updateHoliday.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Holiday updated successfully' });
+      addToast('success', 'Holiday updated successfully');
       query.refetch();
       handleCloseModal();
     },
-    onError: (err) => addToast({ type: 'error', message: err.message || 'Failed to update holiday' }),
+    onError: (err) => addToast('error', err.message || 'Failed to update holiday'),
   });
   const deleteMutation = trpc.pto.deleteHoliday.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Holiday deleted' });
+      addToast('success', 'Holiday deleted');
       query.refetch();
     },
-    onError: (err) => addToast({ type: 'error', message: err.message || 'Failed to delete holiday' }),
+    onError: (err) => addToast('error', err.message || 'Failed to delete holiday'),
   });
   const bulkCreateMutation = trpc.pto.bulkCreateHolidays.useMutation({
     onSuccess: (result) => {
-      addToast({ type: 'success', message: `${result.count} holidays imported successfully` });
+      addToast('success', `${result.count} holidays imported successfully`);
       query.refetch();
       setIsBulkModalOpen(false);
       setBulkText('');
     },
-    onError: (err) => addToast({ type: 'error', message: err.message || 'Failed to import holidays' }),
+    onError: (err) => addToast('error', err.message || 'Failed to import holidays'),
   });
 
   const data = (query.data?.items ?? []) as Holiday[];
@@ -144,7 +144,7 @@ export default function HolidayCalendar(): React.ReactElement {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim() || !form.date) {
-      addToast({ type: 'error', message: 'Name and date are required' });
+      addToast('error', 'Name and date are required');
       return;
     }
     const payload = {
@@ -167,7 +167,7 @@ export default function HolidayCalendar(): React.ReactElement {
 
   const handleBulkImport = () => {
     if (!bulkText.trim()) {
-      addToast({ type: 'error', message: 'Please enter holiday data' });
+      addToast('error', 'Please enter holiday data');
       return;
     }
     const lines = bulkText.trim().split('\n').filter(Boolean);
@@ -186,7 +186,7 @@ export default function HolidayCalendar(): React.ReactElement {
     }).filter((h) => h.date && h.name);
 
     if (holidays.length === 0) {
-      addToast({ type: 'error', message: 'No valid holiday entries found' });
+      addToast('error', 'No valid holiday entries found');
       return;
     }
     bulkCreateMutation.mutate({ holidays });
@@ -380,7 +380,7 @@ export default function HolidayCalendar(): React.ReactElement {
             </Button>
             <Button
               onClick={handleSubmit}
-              loading={createMutation.isLoading || updateMutation.isLoading}
+              loading={createMutation.isPending || updateMutation.isPending}
             >
               {editingId ? 'Update Holiday' : 'Add Holiday'}
             </Button>
@@ -502,7 +502,7 @@ export default function HolidayCalendar(): React.ReactElement {
             </Button>
             <Button
               onClick={handleBulkImport}
-              loading={bulkCreateMutation.isLoading}
+              loading={bulkCreateMutation.isPending}
             >
               <Upload size={16} className="mr-2" />
               Import Holidays

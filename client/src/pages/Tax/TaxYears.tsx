@@ -76,7 +76,7 @@ export default function TaxYears(): React.ReactElement {
             variant="secondary"
             size="sm"
             onClick={() => closeMutation.mutate({ id: row.id })}
-            loading={closeMutation.isLoading}
+            loading={closeMutation.isPending}
           >
             <Lock size={14} className="mr-1" />
             Close Year
@@ -126,7 +126,7 @@ export default function TaxYears(): React.ReactElement {
         footer={
           <>
             <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
-            <Button loading={createMutation.isLoading} onClick={handleCreate}>Create</Button>
+            <Button loading={createMutation.isPending} onClick={handleCreate}>Create</Button>
           </>
         }
       >

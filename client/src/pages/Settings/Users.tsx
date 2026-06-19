@@ -192,7 +192,7 @@ export default function Users(): React.ReactElement {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDeactivate(row.id)}
-                        loading={deactivateMutation.isLoading && deactivateMutation.variables?.id === row.id}
+                        loading={deactivateMutation.isPending && deactivateMutation.variables?.id === row.id}
                         title="Deactivate"
                       >
                         <UserX size={16} className="text-red-500" />
@@ -216,7 +216,7 @@ export default function Users(): React.ReactElement {
         isOpen={showInviteModal}
         onClose={() => setShowInviteModal(false)}
         onSubmit={(data) => inviteMutation.mutate(data)}
-        loading={inviteMutation.isLoading}
+        loading={inviteMutation.isPending}
       />
     </div>
   );

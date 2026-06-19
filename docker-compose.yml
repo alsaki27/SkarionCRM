@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "4000:4000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/skarion
+      - JWT_SECRET=change-me-in-production
+      - NODE_ENV=production
+      - APP_URL=http://localhost:4000
+      - PORT=4000
+    depends_on:
+      - db
+    volumes:
+      - ./server/migrations:/app/migrations
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=skarion
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

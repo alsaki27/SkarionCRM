@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { db } from './index.js';
 import {
   organizations, users, chartOfAccounts, bankAccounts, taxYears,
-  complianceCategories, documentTemplates, pipelineStages, programs, leadSources,
+  complianceCategories, documentTemplates,
   contacts, employees, invoices, invoiceLines, payments, recurringTransactions,
   expenseReports, expenseItems, form1099s, plans, subscriptions, workSchedules,
   timeEntries, attendanceRecords, timesheets, timesheetEntries, projects, projectTasks, projectTimeEntries,
@@ -451,18 +451,17 @@ async function seed() {
     name: 'Standard Week',
     shiftStart: '09:00',
     shiftEnd: '17:00',
-    breakDuration: 60,
+    breakDurationMinutes: 60,
     workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-    dailyOvertimeThreshold: 8,
-    weeklyOvertimeThreshold: 40,
-    gracePeriod: 15,
-    roundingInterval: 15,
+    overtimeThresholdDaily: '8.00',
+    overtimeThresholdWeekly: '40.00',
+    gracePeriodMinutes: 15,
+    roundingIntervalMinutes: 15,
     isActive: true,
   }).returning();
   console.log('Created work schedule:', schedule.name);
 
   // 14.3 Create time entries (clock in/out for past 5 days)
-  const timeEntryData = [];
   for (let dayOffset = 4; dayOffset >= 0; dayOffset--) {
     const day = new Date(today);
     day.setDate(day.getDate() - dayOffset);
@@ -473,45 +472,38 @@ async function seed() {
       const [entryIn] = await db.insert(timeEntries).values({
         orgId: org.id,
         employeeId: emp.id,
-        entryDate: dateStr,
         entryType: 'clock_in',
-        timeStamp: new Date(`${dateStr}T09:00:00Z`),
-        location: 'Office',
-        device: 'Web',
+        timestamp: new Date(`${dateStr}T09:00:00Z`),
       }).returning();
       // Start break at 12:30
       await db.insert(timeEntries).values({
         orgId: org.id,
         employeeId: emp.id,
-        entryDate: dateStr,
         entryType: 'break_start',
-        timeStamp: new Date(`${dateStr}T12:30:00Z`),
+        timestamp: new Date(`${dateStr}T12:30:00Z`),
       });
       // End break at 13:30
       await db.insert(timeEntries).values({
         orgId: org.id,
         employeeId: emp.id,
-        entryDate: dateStr,
         entryType: 'break_end',
-        timeStamp: new Date(`${dateStr}T13:30:00Z`),
+        timestamp: new Date(`${dateStr}T13:30:00Z`),
       });
       // Clock out at 17:00 (or 18:00 for some overtime)
       const outTime = emp.id === createdEmployees[0].id ? '18:00' : '17:00';
       await db.insert(timeEntries).values({
         orgId: org.id,
         employeeId: emp.id,
-        entryDate: dateStr,
         entryType: 'clock_out',
-        timeStamp: new Date(`${dateStr}T${outTime}:00Z`),
+        timestamp: new Date(`${dateStr}T${outTime}:00Z`),
       });
       // Project time entry for some employees
       if (emp.id === createdEmployees[0].id || emp.id === createdEmployees[3].id) {
         await db.insert(timeEntries).values({
           orgId: org.id,
           employeeId: emp.id,
-          entryDate: dateStr,
-          entryType: 'project_time',
-          timeStamp: new Date(`${dateStr}T14:00:00Z`),
+          entryType: 'project_switch',
+          timestamp: new Date(`${dateStr}T14:00:00Z`),
         });
       }
     }
@@ -529,21 +521,18 @@ async function seed() {
       const isOvertime = emp.id === createdEmployees[0].id;
       const inTime = isLate ? '09:20' : '09:00';
       const outTime = isOvertime ? '18:00' : '17:00';
-      const regularHours = isOvertime ? '8' : '8';
-      const overtimeHours = isOvertime ? '1' : '0';
       await db.insert(attendanceRecords).values({
         orgId: org.id,
         employeeId: emp.id,
         date: dateStr,
         status: 'present',
-        clockIn: inTime,
-        clockOut: outTime,
-        breakDuration: 60,
-        regularHours,
-        overtimeHours,
+        clockIn: new Date(`${dateStr}T${inTime}:00Z`),
+        clockOut: new Date(`${dateStr}T${outTime}:00Z`),
         totalHours: isOvertime ? '9' : '8',
-        isLate,
-        isOvertime: isOvertime,
+        breakHours: '1',
+        overtimeHours: isOvertime ? '1' : '0',
+        lateMinutes: isLate ? 20 : 0,
+        earlyDepartureMinutes: 0,
       });
     }
   }
@@ -561,8 +550,8 @@ async function seed() {
       const [ts] = await db.insert(timesheets).values({
         orgId: org.id,
         employeeId: emp.id,
-        weekStartDate: weekStartStr,
-        weekEndDate: weekEndStr,
+        weekStart: weekStartStr,
+        weekEnd: weekEndStr,
         totalHours: w === 0 ? '40' : '40',
         regularHours: '40',
         overtimeHours: '0',
@@ -580,12 +569,11 @@ async function seed() {
           timesheetId: ts.id,
           employeeId: emp.id,
           date: dayStr,
-          clockIn: '09:00',
-          clockOut: '17:00',
-          breakDuration: 60,
-          regularHours: '8',
-          overtimeHours: '0',
-          totalHours: '8',
+          description: 'Daily work',
+          hours: '8',
+          isBillable: true,
+          hourlyRate: '50',
+          totalAmount: '400',
         });
       }
     }
@@ -619,12 +607,12 @@ async function seed() {
         employeeId: emp.id,
         leaveTypeId: lt.id,
         year: currentYear,
-        totalEntitled: lt.maxDaysPerYear?.toString() || '0',
-        accrued: (lt.maxDaysPerYear || 0).toString(),
+        totalEntitled: (lt.maxDaysPerYear || '0').toString(),
+        accrued: (lt.maxDaysPerYear || '0').toString(),
         used: '0',
         pending: '0',
         carryOver: '0',
-        remaining: (lt.maxDaysPerYear || 0).toString(),
+        remaining: (lt.maxDaysPerYear || '0').toString(),
       });
     }
   }

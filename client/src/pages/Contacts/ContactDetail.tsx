@@ -260,7 +260,7 @@ export default function ContactDetail(): React.ReactElement {
                 />
               </div>
               <div className="flex justify-end">
-                <Button type="submit" loading={addCommMutation.isLoading}>
+                <Button type="submit" loading={addCommMutation.isPending}>
                   <Send size={16} className="mr-1" />
                   Log Communication
                 </Button>

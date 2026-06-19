@@ -118,14 +118,14 @@ export default function PayrollRunDetail(): React.ReactElement {
           {run.status === 'draft' && (
             <Button
               onClick={handleProcess}
-              loading={processMutation.isLoading}
+              loading={processMutation.isPending}
             >
               <Play size={16} className="mr-2" />
               Process
             </Button>
           )}
           {run.status === 'completed' && (
-            <Button variant="danger" onClick={handleVoid} loading={voidMutation.isLoading}>
+            <Button variant="danger" onClick={handleVoid} loading={voidMutation.isPending}>
               <Ban size={16} className="mr-2" />
               Void
             </Button>

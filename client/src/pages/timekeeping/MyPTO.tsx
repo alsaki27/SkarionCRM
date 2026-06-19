@@ -86,7 +86,7 @@ export default function MyPTO(): React.ReactElement {
   // tRPC queries
   const { data: balancesData, isLoading: balancesLoading } = trpc.pto.getLeaveBalances.useQuery();
   const { data: requestsData, isLoading: requestsLoading } = trpc.pto.listLeaveRequests.useQuery();
-  const utils = trpc.useContext();
+  const utils = trpc.useUtils();
 
   const createMutation = trpc.pto.createLeaveRequest.useMutation({
     onSuccess: () => {
@@ -247,7 +247,7 @@ export default function MyPTO(): React.ReactElement {
             variant="danger"
             size="sm"
             onClick={() => handleCancel(row.id)}
-            loading={cancelMutation.isLoading}
+            loading={cancelMutation.isPending}
             className="gap-1"
           >
             <X size={14} />
@@ -363,7 +363,7 @@ export default function MyPTO(): React.ReactElement {
             <Button
               variant="primary"
               onClick={handleSubmit}
-              loading={createMutation.isLoading}
+              loading={createMutation.isPending}
               className="gap-1"
             >
               <Plus size={16} />

@@ -221,7 +221,7 @@ export default function ContactList(): React.ReactElement {
             </Button>
             <Button
               variant="danger"
-              loading={deleteMutation.isLoading}
+              loading={deleteMutation.isPending}
               onClick={confirmDelete}
             >
               Delete

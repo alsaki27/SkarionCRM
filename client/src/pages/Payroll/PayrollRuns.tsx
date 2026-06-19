@@ -254,7 +254,7 @@ export default function PayrollRuns(): React.ReactElement {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleProcess(row.id)}
-                        loading={processMutation.isLoading && processMutation.variables?.id === row.id}
+                        loading={processMutation.isPending && processMutation.variables?.id === row.id}
                         title="Process"
                       >
                         <Play size={16} className="text-green-600" />
@@ -265,7 +265,7 @@ export default function PayrollRuns(): React.ReactElement {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleVoid(row.id)}
-                        loading={voidMutation.isLoading && voidMutation.variables?.id === row.id}
+                        loading={voidMutation.isPending && voidMutation.variables?.id === row.id}
                         title="Void"
                       >
                         <Ban size={16} className="text-red-500" />

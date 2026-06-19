@@ -97,7 +97,7 @@ export default function ContactForm(): React.ReactElement {
     }
   };
 
-  const isLoading = contactQuery.isLoading || createMutation.isLoading || updateMutation.isLoading;
+  const isLoading = contactQuery.isLoading || createMutation.isPending || updateMutation.isPending;
 
   if (isEdit && contactQuery.isLoading) {
     return <Loading message="Loading contact..." />;

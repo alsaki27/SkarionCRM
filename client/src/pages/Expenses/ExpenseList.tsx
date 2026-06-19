@@ -355,7 +355,7 @@ export default function ExpenseList(): React.ReactElement {
               Cancel
             </Button>
             <Button
-              loading={reimburseMutation.isLoading}
+              loading={reimburseMutation.isPending}
               onClick={() => {
                 if (!reimburseModal.amount || parseFloat(reimburseModal.amount) <= 0) {
                   addToast('error', 'Please enter a valid amount');
@@ -403,7 +403,7 @@ export default function ExpenseList(): React.ReactElement {
             </Button>
             <Button
               variant="danger"
-              loading={rejectMutation.isLoading}
+              loading={rejectMutation.isPending}
               onClick={() => {
                 if (!rejectModal.reason.trim()) {
                   addToast('error', 'Please provide a rejection reason');

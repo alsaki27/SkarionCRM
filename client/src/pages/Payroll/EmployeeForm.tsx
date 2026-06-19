@@ -158,7 +158,7 @@ export default function EmployeeForm(): React.ReactElement {
     return <Loading message="Loading employee..." />;
   }
 
-  const isSubmitting = createMutation.isLoading || updateMutation.isLoading;
+  const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">

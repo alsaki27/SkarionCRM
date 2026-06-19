@@ -201,8 +201,8 @@ export default function ExpenseForm(): React.ReactElement {
 
   const isLoading =
     (isEdit && reportQuery.isLoading) ||
-    createMutation.isLoading ||
-    updateMutation.isLoading;
+    createMutation.isPending ||
+    updateMutation.isPending;
 
   if (isEdit && reportQuery.isLoading) {
     return <Loading message="Loading expense report..." />;

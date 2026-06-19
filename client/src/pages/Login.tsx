@@ -112,7 +112,7 @@ export default function Login(): React.ReactElement {
                 type="submit"
                 variant="primary"
                 size="lg"
-                loading={loginMutation.isLoading}
+                loading={loginMutation.isPending}
                 className="w-full"
               >
                 Sign in

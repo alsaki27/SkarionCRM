@@ -58,26 +58,26 @@ export default function WorkSchedules(): React.ReactElement {
   const query = trpc.timekeeping.listWorkSchedules.useQuery({ page, pageSize });
   const createMutation = trpc.timekeeping.createWorkSchedule.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Schedule created successfully' });
+      addToast('success', 'Schedule created successfully');
       query.refetch();
       handleCloseModal();
     },
-    onError: (err) => addToast({ type: 'error', message: err.message || 'Failed to create schedule' }),
+    onError: (err) => addToast('error', err.message || 'Failed to create schedule'),
   });
   const updateMutation = trpc.timekeeping.updateWorkSchedule.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Schedule updated successfully' });
+      addToast('success', 'Schedule updated successfully');
       query.refetch();
       handleCloseModal();
     },
-    onError: (err) => addToast({ type: 'error', message: err.message || 'Failed to update schedule' }),
+    onError: (err) => addToast('error', err.message || 'Failed to update schedule'),
   });
   const deleteMutation = trpc.timekeeping.deleteWorkSchedule.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Schedule deleted' });
+      addToast('success', 'Schedule deleted');
       query.refetch();
     },
-    onError: (err) => addToast({ type: 'error', message: err.message || 'Failed to delete schedule' }),
+    onError: (err) => addToast('error', err.message || 'Failed to delete schedule'),
   });
 
   const data = (query.data?.items ?? []) as WorkSchedule[];
@@ -115,7 +115,7 @@ export default function WorkSchedules(): React.ReactElement {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) {
-      addToast({ type: 'error', message: 'Schedule name is required' });
+      addToast('error', 'Schedule name is required');
       return;
     }
     if (editingId) {
@@ -267,7 +267,7 @@ export default function WorkSchedules(): React.ReactElement {
             </Button>
             <Button
               onClick={handleSubmit}
-              loading={createMutation.isLoading || updateMutation.isLoading}
+              loading={createMutation.isPending || updateMutation.isPending}
             >
               {editingId ? 'Update Schedule' : 'Create Schedule'}
             </Button>

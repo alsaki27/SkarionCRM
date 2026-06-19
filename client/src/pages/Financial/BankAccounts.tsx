@@ -200,7 +200,7 @@ export default function BankAccounts(): React.ReactElement {
         footer={
           <>
             <Button variant="secondary" onClick={() => { setModalOpen(false); setEditAccount(null); }}>Cancel</Button>
-            <Button loading={createMutation.isLoading || updateMutation.isLoading} onClick={handleSubmit}>
+            <Button loading={createMutation.isPending || updateMutation.isPending} onClick={handleSubmit}>
               {editAccount ? 'Update' : 'Create'}
             </Button>
           </>
@@ -299,7 +299,7 @@ export default function BankAccounts(): React.ReactElement {
         footer={
           <>
             <Button variant="secondary" onClick={() => { setDeleteModalOpen(false); setAccountToDelete(null); }}>Cancel</Button>
-            <Button variant="danger" loading={deleteMutation.isLoading} onClick={confirmDelete}>Delete</Button>
+            <Button variant="danger" loading={deleteMutation.isPending} onClick={confirmDelete}>Delete</Button>
           </>
         }
       >

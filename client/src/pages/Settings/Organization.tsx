@@ -257,7 +257,7 @@ export default function Organization(): React.ReactElement {
               Saved successfully
             </div>
           )}
-          <Button type="submit" loading={updateMutation.isLoading}>
+          <Button type="submit" loading={updateMutation.isPending}>
             <Save size={16} className="mr-2" />
             Save Settings
           </Button>

@@ -28,6 +28,8 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@skarion/shared": "*",
+    "@trpc/server": "^11.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "typescript": "^5.6.0",

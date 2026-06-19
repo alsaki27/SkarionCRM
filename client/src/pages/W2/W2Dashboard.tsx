@@ -68,7 +68,7 @@ export default function W2Dashboard(): React.ReactElement {
             </select>
             <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
-          <Button onClick={handleGenerate} loading={generateMutation.isLoading}>
+          <Button onClick={handleGenerate} loading={generateMutation.isPending}>
             <Wand2 size={16} className="mr-2" />
             Generate W2s
           </Button>

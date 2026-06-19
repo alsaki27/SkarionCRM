@@ -294,7 +294,7 @@ export default function NotificationList(): React.ReactElement {
           {!row.read && (
             <button
               onClick={() => markAsReadMutation.mutate({ id: row.id })}
-              disabled={markAsReadMutation.isLoading}
+              disabled={markAsReadMutation.isPending}
               className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
               title="Mark as read"
             >
@@ -303,7 +303,7 @@ export default function NotificationList(): React.ReactElement {
           )}
           <button
             onClick={() => dismissMutation.mutate({ id: row.id })}
-            disabled={dismissMutation.isLoading}
+            disabled={dismissMutation.isPending}
             className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
             title="Dismiss"
           >
@@ -311,7 +311,7 @@ export default function NotificationList(): React.ReactElement {
           </button>
           <button
             onClick={() => deleteMutation.mutate({ id: row.id })}
-            disabled={deleteMutation.isLoading}
+            disabled={deleteMutation.isPending}
             className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
             title="Delete"
           >
@@ -342,7 +342,7 @@ export default function NotificationList(): React.ReactElement {
               variant="secondary"
               size="sm"
               onClick={() => markAllAsReadMutation.mutate()}
-              loading={markAllAsReadMutation.isLoading}
+              loading={markAllAsReadMutation.isPending}
             >
               <CheckCheck size={16} className="mr-1.5" />
               Mark all as read
@@ -414,7 +414,7 @@ export default function NotificationList(): React.ReactElement {
                   variant="secondary"
                   size="sm"
                   onClick={handleBulkMarkRead}
-                  loading={markAsReadMutation.isLoading}
+                  loading={markAsReadMutation.isPending}
                 >
                   <Check size={14} className="mr-1" />
                   Mark as read
@@ -423,7 +423,7 @@ export default function NotificationList(): React.ReactElement {
                   variant="secondary"
                   size="sm"
                   onClick={handleBulkDismiss}
-                  loading={dismissMutation.isLoading}
+                  loading={dismissMutation.isPending}
                 >
                   <X size={14} className="mr-1" />
                   Dismiss
@@ -432,7 +432,7 @@ export default function NotificationList(): React.ReactElement {
                   variant="danger"
                   size="sm"
                   onClick={handleBulkDelete}
-                  loading={deleteMutation.isLoading}
+                  loading={deleteMutation.isPending}
                 >
                   <Trash2 size={14} className="mr-1" />
                   Delete

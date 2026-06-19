@@ -13,9 +13,8 @@
     "declarationMap": true,
     "sourceMap": true,
     "outDir": "./dist",
-    "rootDir": ".",
-    "composite": true
+    "rootDir": "."
   },
-  "include": ["server/**/*", "client/**/*", "packages/**/*"],
+  "include": ["server", "client", "packages"],
   "exclude": ["node_modules", "dist", "build"]
 }

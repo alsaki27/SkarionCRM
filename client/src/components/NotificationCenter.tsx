@@ -177,7 +177,7 @@ export default function NotificationCenter(): React.ReactElement {
               {unreadCount > 0 && (
                 <button
                   onClick={handleMarkAllAsRead}
-                  disabled={markAllAsReadMutation.isLoading}
+                  disabled={markAllAsReadMutation.isPending}
                   className="flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700 transition-colors disabled:opacity-50"
                 >
                   <CheckCheck size={14} />
@@ -268,7 +268,7 @@ export default function NotificationCenter(): React.ReactElement {
                       {!notification.read && (
                         <button
                           onClick={(e) => handleMarkAsRead(notification.id, e)}
-                          disabled={markAsReadMutation.isLoading}
+                          disabled={markAsReadMutation.isPending}
                           className="rounded p-1 text-gray-400 opacity-0 group-hover:opacity-100 hover:bg-gray-100 hover:text-gray-600 transition-all"
                           title="Mark as read"
                         >

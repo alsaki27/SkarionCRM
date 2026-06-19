@@ -165,7 +165,7 @@ export default function Register(): React.ReactElement {
                 type="submit"
                 variant="primary"
                 size="lg"
-                loading={registerMutation.isLoading}
+                loading={registerMutation.isPending}
                 className="w-full"
               >
                 Create account

@@ -59,26 +59,26 @@ export default function LeavePolicies(): React.ReactElement {
   const query = trpc.pto.listLeaveTypes.useQuery({ page, pageSize });
   const createMutation = trpc.pto.createLeaveType.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Leave type created successfully' });
+      addToast('success', 'Leave type created successfully');
       query.refetch();
       handleCloseModal();
     },
-    onError: (err) => addToast({ type: 'error', message: err.message || 'Failed to create leave type' }),
+    onError: (err) => addToast('error', err.message || 'Failed to create leave type'),
   });
   const updateMutation = trpc.pto.updateLeaveType.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Leave type updated successfully' });
+      addToast('success', 'Leave type updated successfully');
       query.refetch();
       handleCloseModal();
     },
-    onError: (err) => addToast({ type: 'error', message: err.message || 'Failed to update leave type' }),
+    onError: (err) => addToast('error', err.message || 'Failed to update leave type'),
   });
   const deleteMutation = trpc.pto.deleteLeaveType.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Leave type deleted' });
+      addToast('success', 'Leave type deleted');
       query.refetch();
     },
-    onError: (err) => addToast({ type: 'error', message: err.message || 'Failed to delete leave type' }),
+    onError: (err) => addToast('error', err.message || 'Failed to delete leave type'),
   });
 
   const data = (query.data?.items ?? []) as LeaveType[];
@@ -116,7 +116,7 @@ export default function LeavePolicies(): React.ReactElement {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) {
-      addToast({ type: 'error', message: 'Leave type name is required' });
+      addToast('error', 'Leave type name is required');
       return;
     }
     if (editingId) {
@@ -276,7 +276,7 @@ export default function LeavePolicies(): React.ReactElement {
             </Button>
             <Button
               onClick={handleSubmit}
-              loading={createMutation.isLoading || updateMutation.isLoading}
+              loading={createMutation.isPending || updateMutation.isPending}
             >
               {editingId ? 'Update Leave Type' : 'Create Leave Type'}
             </Button>

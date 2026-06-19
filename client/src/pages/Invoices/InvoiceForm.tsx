@@ -87,28 +87,28 @@ const InvoiceForm: React.FC = () => {
     { enabled: isEdit }
   );
 
-  const utils = trpc.useContext();
+  const utils = trpc.useUtils();
 
   const createMutation = trpc.invoice.createInvoice.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Invoice created successfully' });
+      addToast('success', 'Invoice created successfully');
       utils.invoice.listInvoices.invalidate();
       navigate('/invoices');
     },
     onError: (err) => {
-      addToast({ type: 'error', message: err.message || 'Failed to create invoice' });
+      addToast('error', err.message || 'Failed to create invoice');
     },
   });
 
   const updateMutation = trpc.invoice.updateInvoice.useMutation({
     onSuccess: () => {
-      addToast({ type: 'success', message: 'Invoice updated successfully' });
+      addToast('success', 'Invoice updated successfully');
       utils.invoice.listInvoices.invalidate();
       utils.invoice.getInvoiceById.invalidate({ id: id! });
       navigate('/invoices');
     },
     onError: (err) => {
-      addToast({ type: 'error', message: err.message || 'Failed to update invoice' });
+      addToast('error', err.message || 'Failed to update invoice');
     },
   });
 
@@ -206,7 +206,7 @@ const InvoiceForm: React.FC = () => {
             <X className="w-4 h-4 mr-2" />
             Cancel
           </Button>
-          <Button onClick={handleSubmit} loading={createMutation.isLoading || updateMutation.isLoading}>
+          <Button onClick={handleSubmit} loading={createMutation.isPending || updateMutation.isPending}>
             <Save className="w-4 h-4 mr-2" />
             Save
           </Button>

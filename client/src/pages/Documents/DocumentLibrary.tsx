@@ -126,7 +126,7 @@ export default function DocumentLibrary(): React.ReactElement {
           <h1 className="page-title">Document Library</h1>
           <p className="page-subtitle">Manage documents and attachments</p>
         </div>
-        <Button onClick={handleSimulateUpload} loading={createMutation.isLoading}>
+        <Button onClick={handleSimulateUpload} loading={createMutation.isPending}>
           <Upload size={16} className="mr-2" />
           Upload Document
         </Button>
@@ -241,7 +241,7 @@ export default function DocumentLibrary(): React.ReactElement {
                     variant="ghost"
                     size="sm"
                     onClick={() => handleDelete(doc.id)}
-                    loading={deleteMutation.isLoading && deleteMutation.variables?.id === doc.id}
+                    loading={deleteMutation.isPending && deleteMutation.variables?.id === doc.id}
                   >
                     <Trash2 size={14} className="text-red-500" />
                   </Button>
@@ -273,7 +273,7 @@ export default function DocumentLibrary(): React.ReactElement {
                   variant="ghost"
                   size="sm"
                   onClick={() => handleDelete(doc.id)}
-                  loading={deleteMutation.isLoading && deleteMutation.variables?.id === doc.id}
+                  loading={deleteMutation.isPending && deleteMutation.variables?.id === doc.id}
                 >
                   <Trash2 size={14} className="text-red-500" />
                 </Button>

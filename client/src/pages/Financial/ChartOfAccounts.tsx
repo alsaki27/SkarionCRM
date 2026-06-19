@@ -261,7 +261,7 @@ export default function ChartOfAccounts(): React.ReactElement {
               Cancel
             </Button>
             <Button
-              loading={createMutation.isLoading || updateMutation.isLoading}
+              loading={createMutation.isPending || updateMutation.isPending}
               onClick={handleSubmit}
             >
               {editAccount ? 'Update' : 'Create'}
@@ -351,7 +351,7 @@ export default function ChartOfAccounts(): React.ReactElement {
             <Button variant="secondary" onClick={() => { setDeleteModalOpen(false); setAccountToDelete(null); }}>
               Cancel
             </Button>
-            <Button variant="danger" loading={deleteMutation.isLoading} onClick={confirmDelete}>
+            <Button variant="danger" loading={deleteMutation.isPending} onClick={confirmDelete}>
               Delete
             </Button>
           </>

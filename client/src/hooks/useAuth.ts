@@ -15,7 +15,7 @@ export function useAuth() {
     isError: meQuery.isError,
     login: loginMutation.mutate,
     register: registerMutation.mutate,
-    isLoginLoading: loginMutation.isLoading,
-    isRegisterLoading: registerMutation.isLoading,
+    isLoginLoading: loginMutation.isPending,
+    isRegisterLoading: registerMutation.isPending,
   };
 }

@@ -136,8 +136,8 @@ export default function RecurringForm(): React.ReactElement {
 
   const isLoading =
     (isEdit && recurringQuery.isLoading) ||
-    createMutation.isLoading ||
-    updateMutation.isLoading;
+    createMutation.isPending ||
+    updateMutation.isPending;
 
   if (isEdit && recurringQuery.isLoading) {
     return <Loading message="Loading recurring transaction..." />;
