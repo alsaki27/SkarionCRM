@@ -15,6 +15,13 @@
       "when": 1781821963798,
       "tag": "0001_orange_puff_adder",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781838648050,
+      "tag": "0002_lonely_pride",
+      "breakpoints": true
     }
   ]
 }

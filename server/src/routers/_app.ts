@@ -2,6 +2,7 @@ import { router } from '../trpc.js';
 import { orgRouter } from './org.js';
 import { authRouter } from './auth.js';
 import { contactRouter } from './contact.js';
+import { projectsRouter } from './projects.js';
 import { financialRouter } from './financial.js';
 import { taxRouter } from './tax.js';
 import { complianceRouter } from './compliance.js';
@@ -22,11 +23,15 @@ import { notificationRouter } from './notification.js';
 import { activityRouter } from './activity.js';
 import { integrationRouter } from './integration.js';
 import { importJobRouter } from './importJob.js';
+import { atsRouter } from './ats.js';
+import { timekeepingRouter } from './timekeeping.js';
+import { ptoRouter } from './pto.js';
 
 export const appRouter = router({
   auth: authRouter,
   org: orgRouter,
   contact: contactRouter,
+  projects: projectsRouter,
   financial: financialRouter,
   tax: taxRouter,
   compliance: complianceRouter,
@@ -47,6 +52,9 @@ export const appRouter = router({
   activity: activityRouter,
   integration: integrationRouter,
   importJob: importJobRouter,
+  ats: atsRouter,
+  timekeeping: timekeepingRouter,
+  pto: ptoRouter,
 });
 
 export type AppRouter = typeof appRouter;

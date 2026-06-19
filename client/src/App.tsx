@@ -52,6 +52,17 @@ import ApiKeys from './pages/Settings/ApiKeys.tsx';
 import Webhooks from './pages/Settings/Webhooks.tsx';
 import Integrations from './pages/Settings/Integrations.tsx';
 import TeamMembers from './pages/Settings/TeamMembers.tsx';
+import EmployeeDashboard from './pages/timekeeping/EmployeeDashboard.tsx';
+import MyTimesheets from './pages/timekeeping/MyTimesheets.tsx';
+import MyPTO from './pages/timekeeping/MyPTO.tsx';
+import MyProjects from './pages/timekeeping/MyProjects.tsx';
+import TeamPresence from './pages/timekeeping/manager/TeamPresence.tsx';
+import ApprovalQueue from './pages/timekeeping/manager/ApprovalQueue.tsx';
+import TeamCalendar from './pages/timekeeping/manager/TeamCalendar.tsx';
+import WorkSchedules from './pages/timekeeping/admin/WorkSchedules.tsx';
+import LeavePolicies from './pages/timekeeping/admin/LeavePolicies.tsx';
+import HolidayCalendar from './pages/timekeeping/admin/HolidayCalendar.tsx';
+import ProjectSetup from './pages/timekeeping/admin/ProjectSetup.tsx';
 
 function App() {
   const { user, isAuthenticated, setAuth, logout } = useAuthStore();
@@ -174,6 +185,19 @@ function App() {
         {/* Notifications */}
         <Route path="/notifications" element={<NotificationList />} />
         
+        {/* Timekeeping */}
+        <Route path="/timekeeping" element={<EmployeeDashboard />} />
+        <Route path="/timekeeping/timesheets" element={<MyTimesheets />} />
+        <Route path="/timekeeping/pto" element={<MyPTO />} />
+        <Route path="/timekeeping/projects" element={<MyProjects />} />
+        <Route path="/timekeeping/team" element={<TeamPresence />} />
+        <Route path="/timekeeping/approvals" element={<ApprovalQueue />} />
+        <Route path="/timekeeping/team-calendar" element={<TeamCalendar />} />
+        <Route path="/timekeeping/admin/schedules" element={<WorkSchedules />} />
+        <Route path="/timekeeping/admin/leave-policies" element={<LeavePolicies />} />
+        <Route path="/timekeeping/admin/holidays" element={<HolidayCalendar />} />
+        <Route path="/timekeeping/admin/projects" element={<ProjectSetup />} />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

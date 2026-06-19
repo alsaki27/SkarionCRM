@@ -1,5 +1,5 @@
 import {
-  pgTable, pgEnum, uuid, varchar, integer, boolean, timestamp, text, date,
+  pgTable, pgEnum, uuid, varchar, integer, boolean, timestamp, text, date, time,
   jsonb, numeric, index, uniqueIndex, inet, decimal, serial, primaryKey,
   foreignKey
 } from 'drizzle-orm/pg-core';
@@ -618,6 +618,7 @@ export const employees = pgTable('employees', {
   id: uuid('id').defaultRandom().primaryKey(),
   orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   contactId: uuid('contact_id').references(() => contacts.id, { onDelete: 'set null' }),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
   employeeId: varchar('employee_id', { length: 50 }).notNull(),
   ssnHash: varchar('ssn_hash', { length: 255 }),
   firstName: varchar('first_name', { length: 100 }).notNull(),
@@ -656,6 +657,7 @@ export const employees = pgTable('employees', {
 export const employeesRelations = relations(employees, ({ one, many }) => ({
   organization: one(organizations, { fields: [employees.orgId], references: [organizations.id] }),
   contact: one(contacts, { fields: [employees.contactId], references: [contacts.id] }),
+  user: one(users, { fields: [employees.userId], references: [users.id] }),
   payrollEntries: many(payrollEntries),
   w2Forms: many(w2Forms),
 }));
@@ -1564,5 +1566,465 @@ export const aiConversations = pgTable('ai_conversations', {
 export const aiConversationsRelations = relations(aiConversations, ({ one }) => ({
   organization: one(organizations, { fields: [aiConversations.orgId], references: [organizations.id] }),
   user: one(users, { fields: [aiConversations.userId], references: [users.id] }),
+}));
+
+// ============================================================================
+// TIMEKEEPING MODULE — Employee Timekeeping & Workforce Monitoring
+// ============================================================================
+
+export const timeEntryTypeEnum = pgEnum('time_entry_type', [
+  'clock_in', 'clock_out', 'lunch_start', 'lunch_end', 'break_start', 'break_end', 'project_switch',
+]);
+
+export const attendanceStatusEnum = pgEnum('attendance_status', [
+  'present', 'absent', 'late', 'half_day', 'on_leave', 'remote', 'holiday', 'weekend',
+]);
+
+export const timesheetStatusEnum = pgEnum('timesheet_status', [
+  'draft', 'submitted', 'approved', 'rejected',
+]);
+
+export const leaveTypeEnum = pgEnum('leave_type', [
+  'vacation', 'sick', 'personal', 'maternity', 'paternity', 'bereavement', 'jury_duty', 'unpaid', 'other',
+]);
+
+export const leaveStatusEnum = pgEnum('leave_status', [
+  'pending', 'approved', 'rejected', 'cancelled',
+]);
+
+export const projectStatusEnum = pgEnum('project_status', [
+  'active', 'completed', 'on_hold', 'cancelled',
+]);
+
+export const shiftSwapStatusEnum = pgEnum('shift_swap_status', [
+  'pending', 'approved', 'rejected', 'cancelled',
+]);
+
+// Work Schedules
+export const workSchedules = pgTable('work_schedules', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  shiftStart: time('shift_start').notNull(), // e.g., "09:00"
+  shiftEnd: time('shift_end').notNull(), // e.g., "17:00"
+  breakDurationMinutes: integer('break_duration_minutes').default(60),
+  workingDays: text('working_days').array().default('{}'), // ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+  overtimeThresholdDaily: decimal('overtime_threshold_daily', { precision: 5, scale: 2 }).default('8.00'), // hours
+  overtimeThresholdWeekly: decimal('overtime_threshold_weekly', { precision: 5, scale: 2 }).default('40.00'), // hours
+  gracePeriodMinutes: integer('grace_period_minutes').default(5),
+  roundingIntervalMinutes: integer('rounding_interval_minutes').default(15),
+  isActive: boolean('is_active').default(true),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_work_schedule_org').on(table.orgId),
+  index('idx_work_schedule_active').on(table.isActive).where(sql`${table.isActive} = true`),
+]);
+
+export const workSchedulesRelations = relations(workSchedules, ({ one }) => ({
+  organization: one(organizations, { fields: [workSchedules.orgId], references: [organizations.id] }),
+}));
+
+// Time Entries (clock in/out, lunch, breaks)
+export const timeEntries = pgTable('time_entries', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  employeeId: uuid('employee_id').notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  entryType: timeEntryTypeEnum('entry_type').notNull(),
+  timestamp: timestamp('timestamp', { withTimezone: true }).notNull().defaultNow(),
+  source: varchar('source', { length: 50 }).default('web'), // web, agent, manual, kiosk
+  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }),
+  taskId: uuid('task_id').references(() => projectTasks.id, { onDelete: 'set null' }),
+  activityScore: integer('activity_score').default(0), // 0-100
+  screenshotId: uuid('screenshot_id'), // future desktop agent
+  notes: text('notes'),
+  ipAddress: inet('ip_address'),
+  geoLocation: jsonb('geo_location').default('{}'), // { lat, lng, accuracy }
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_time_entry_org').on(table.orgId),
+  index('idx_time_entry_employee').on(table.employeeId),
+  index('idx_time_entry_date').on(table.timestamp),
+  index('idx_time_entry_type').on(table.entryType),
+  index('idx_time_entry_project').on(table.projectId),
+]);
+
+export const timeEntriesRelations = relations(timeEntries, ({ one }) => ({
+  organization: one(organizations, { fields: [timeEntries.orgId], references: [organizations.id] }),
+  employee: one(employees, { fields: [timeEntries.employeeId], references: [employees.id] }),
+  project: one(projects, { fields: [timeEntries.projectId], references: [projects.id] }),
+  task: one(projectTasks, { fields: [timeEntries.taskId], references: [projectTasks.id] }),
+}));
+
+// Attendance Records (daily roll call)
+export const attendanceRecords = pgTable('attendance_records', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  employeeId: uuid('employee_id').notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  date: date('date').notNull(),
+  status: attendanceStatusEnum('status').default('present'),
+  clockIn: timestamp('clock_in', { withTimezone: true }),
+  clockOut: timestamp('clock_out', { withTimezone: true }),
+  totalHours: decimal('total_hours', { precision: 5, scale: 2 }).default('0'),
+  breakHours: decimal('break_hours', { precision: 5, scale: 2 }).default('0'),
+  overtimeHours: decimal('overtime_hours', { precision: 5, scale: 2 }).default('0'),
+  lateMinutes: integer('late_minutes').default(0),
+  earlyDepartureMinutes: integer('early_departure_minutes').default(0),
+  notes: text('notes'),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  uniqueIndex('idx_attendance_emp_date').on(table.employeeId, table.date),
+  index('idx_attendance_org').on(table.orgId),
+  index('idx_attendance_date').on(table.date),
+  index('idx_attendance_status').on(table.status),
+]);
+
+export const attendanceRecordsRelations = relations(attendanceRecords, ({ one }) => ({
+  organization: one(organizations, { fields: [attendanceRecords.orgId], references: [organizations.id] }),
+  employee: one(employees, { fields: [attendanceRecords.employeeId], references: [employees.id] }),
+}));
+
+// Timesheets (weekly summaries)
+export const timesheets = pgTable('timesheets', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  employeeId: uuid('employee_id').notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  weekStart: date('week_start').notNull(),
+  weekEnd: date('week_end').notNull(),
+  status: timesheetStatusEnum('status').default('draft'),
+  totalHours: decimal('total_hours', { precision: 5, scale: 2 }).default('0'),
+  regularHours: decimal('regular_hours', { precision: 5, scale: 2 }).default('0'),
+  overtimeHours: decimal('overtime_hours', { precision: 5, scale: 2 }).default('0'),
+  breakHours: decimal('break_hours', { precision: 5, scale: 2 }).default('0'),
+  billableHours: decimal('billable_hours', { precision: 5, scale: 2 }).default('0'),
+  submittedAt: timestamp('submitted_at', { withTimezone: true }),
+  approvedBy: uuid('approved_by').references(() => users.id, { onDelete: 'set null' }),
+  approvedAt: timestamp('approved_at', { withTimezone: true }),
+  rejectionReason: text('rejection_reason'),
+  notes: text('notes'),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  uniqueIndex('idx_timesheet_emp_week').on(table.employeeId, table.weekStart),
+  index('idx_timesheet_org').on(table.orgId),
+  index('idx_timesheet_status').on(table.status),
+  index('idx_timesheet_employee').on(table.employeeId),
+]);
+
+export const timesheetsRelations = relations(timesheets, ({ one }) => ({
+  organization: one(organizations, { fields: [timesheets.orgId], references: [organizations.id] }),
+  employee: one(employees, { fields: [timesheets.employeeId], references: [employees.id] }),
+  approver: one(users, { fields: [timesheets.approvedBy], references: [users.id] }),
+}));
+
+// Timesheet Entries (daily line items)
+export const timesheetEntries = pgTable('timesheet_entries', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  timesheetId: uuid('timesheet_id').notNull().references(() => timesheets.id, { onDelete: 'cascade' }),
+  employeeId: uuid('employee_id').notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  date: date('date').notNull(),
+  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }),
+  taskId: uuid('task_id').references(() => projectTasks.id, { onDelete: 'set null' }),
+  description: text('description'),
+  hours: decimal('hours', { precision: 5, scale: 2 }).default('0'),
+  isBillable: boolean('is_billable').default(true),
+  hourlyRate: decimal('hourly_rate', { precision: 10, scale: 2 }),
+  totalAmount: decimal('total_amount', { precision: 10, scale: 2 }).default('0'),
+  notes: text('notes'),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_ts_entry_timesheet').on(table.timesheetId),
+  index('idx_ts_entry_org').on(table.orgId),
+  index('idx_ts_entry_employee').on(table.employeeId),
+  index('idx_ts_entry_date').on(table.date),
+  index('idx_ts_entry_project').on(table.projectId),
+]);
+
+export const timesheetEntriesRelations = relations(timesheetEntries, ({ one }) => ({
+  timesheet: one(timesheets, { fields: [timesheetEntries.timesheetId], references: [timesheets.id] }),
+  organization: one(organizations, { fields: [timesheetEntries.orgId], references: [organizations.id] }),
+  employee: one(employees, { fields: [timesheetEntries.employeeId], references: [employees.id] }),
+  project: one(projects, { fields: [timesheetEntries.projectId], references: [projects.id] }),
+  task: one(projectTasks, { fields: [timesheetEntries.taskId], references: [projectTasks.id] }),
+}));
+
+// Projects
+export const projects = pgTable('projects', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  clientId: uuid('client_id').references(() => contacts.id, { onDelete: 'set null' }), // link to contacts as client
+  managerId: uuid('manager_id').references(() => users.id, { onDelete: 'set null' }), // project manager
+  budgetHours: decimal('budget_hours', { precision: 10, scale: 2 }),
+  hourlyRate: decimal('hourly_rate', { precision: 10, scale: 2 }),
+  status: projectStatusEnum('status').default('active'),
+  isBillable: boolean('is_billable').default(true),
+  startDate: date('start_date'),
+  endDate: date('end_date'),
+  color: varchar('color', { length: 7 }).default('#3b82f6'), // hex color for UI
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_project_org').on(table.orgId),
+  index('idx_project_client').on(table.clientId),
+  index('idx_project_status').on(table.status),
+  index('idx_project_manager').on(table.managerId),
+]);
+
+export const projectsRelations = relations(projects, ({ one, many }) => ({
+  organization: one(organizations, { fields: [projects.orgId], references: [organizations.id] }),
+  client: one(contacts, { fields: [projects.clientId], references: [contacts.id] }),
+  manager: one(users, { fields: [projects.managerId], references: [users.id] }),
+  tasks: many(projectTasks),
+  timeEntries: many(projectTimeEntries),
+}));
+
+// Project Tasks
+export const projectTasks = pgTable('project_tasks', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  parentTaskId: uuid('parent_task_id').references(() => projectTasks.id, { onDelete: 'set null' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  estimatedHours: decimal('estimated_hours', { precision: 10, scale: 2 }),
+  status: varchar('status', { length: 50 }).default('active'), // active, completed, on_hold
+  assignedTo: uuid('assigned_to').references(() => employees.id, { onDelete: 'set null' }),
+  dueDate: date('due_date'),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_proj_task_project').on(table.projectId),
+  index('idx_proj_task_org').on(table.orgId),
+  index('idx_proj_task_parent').on(table.parentTaskId),
+  index('idx_proj_task_assigned').on(table.assignedTo),
+]);
+
+export const projectTasksRelations = relations(projectTasks, ({ one, many }) => ({
+  project: one(projects, { fields: [projectTasks.projectId], references: [projects.id] }),
+  organization: one(organizations, { fields: [projectTasks.orgId], references: [organizations.id] }),
+  parent: one(projectTasks, { fields: [projectTasks.parentTaskId], references: [projectTasks.id] }),
+  assignee: one(employees, { fields: [projectTasks.assignedTo], references: [employees.id] }),
+  subtasks: many(projectTasks),
+}));
+
+// Project Time Entries (allocated time to projects)
+export const projectTimeEntries = pgTable('project_time_entries', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  employeeId: uuid('employee_id').notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  taskId: uuid('task_id').references(() => projectTasks.id, { onDelete: 'set null' }),
+  date: date('date').notNull(),
+  hours: decimal('hours', { precision: 5, scale: 2 }).notNull().default('0'),
+  isBillable: boolean('is_billable').default(true),
+  hourlyRate: decimal('hourly_rate', { precision: 10, scale: 2 }),
+  totalAmount: decimal('total_amount', { precision: 10, scale: 2 }).default('0'),
+  description: text('description'),
+  notes: text('notes'),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_proj_time_org').on(table.orgId),
+  index('idx_proj_time_employee').on(table.employeeId),
+  index('idx_proj_time_project').on(table.projectId),
+  index('idx_proj_time_date').on(table.date),
+  index('idx_proj_time_task').on(table.taskId),
+]);
+
+export const projectTimeEntriesRelations = relations(projectTimeEntries, ({ one }) => ({
+  organization: one(organizations, { fields: [projectTimeEntries.orgId], references: [organizations.id] }),
+  employee: one(employees, { fields: [projectTimeEntries.employeeId], references: [employees.id] }),
+  project: one(projects, { fields: [projectTimeEntries.projectId], references: [projects.id] }),
+  task: one(projectTasks, { fields: [projectTimeEntries.taskId], references: [projectTasks.id] }),
+}));
+
+// Leave Types
+export const leaveTypes = pgTable('leave_types', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 100 }).notNull(),
+  type: leaveTypeEnum('type').notNull(),
+  description: text('description'),
+  isPaid: boolean('is_paid').default(true),
+  requiresApproval: boolean('requires_approval').default(true),
+  maxDaysPerYear: decimal('max_days_per_year', { precision: 5, scale: 2 }).default('10'),
+  accrualRate: decimal('accrual_rate', { precision: 5, scale: 2 }).default('0'), // per pay period
+  accrualPeriod: varchar('accrual_period', { length: 50 }).default('monthly'), // monthly, biweekly, annual, anniversary
+  carryOverLimit: decimal('carry_over_limit', { precision: 5, scale: 2 }).default('5'),
+  useItOrLoseIt: boolean('use_it_or_lose_it').default(false),
+  isActive: boolean('is_active').default(true),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_leave_type_org').on(table.orgId),
+  index('idx_leave_type_active').on(table.isActive).where(sql`${table.isActive} = true`),
+]);
+
+export const leaveTypesRelations = relations(leaveTypes, ({ one }) => ({
+  organization: one(organizations, { fields: [leaveTypes.orgId], references: [organizations.id] }),
+}));
+
+// Leave Requests
+export const leaveRequests = pgTable('leave_requests', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  employeeId: uuid('employee_id').notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  leaveTypeId: uuid('leave_type_id').notNull().references(() => leaveTypes.id, { onDelete: 'restrict' }),
+  startDate: date('start_date').notNull(),
+  endDate: date('end_date').notNull(),
+  daysRequested: decimal('days_requested', { precision: 5, scale: 2 }).notNull().default('1'),
+  isHalfDay: boolean('is_half_day').default(false),
+  halfDayType: varchar('half_day_type', { length: 20 }), // morning, afternoon
+  status: leaveStatusEnum('status').default('pending'),
+  reason: text('reason'),
+  managerId: uuid('manager_id').references(() => users.id, { onDelete: 'set null' }),
+  approvedBy: uuid('approved_by').references(() => users.id, { onDelete: 'set null' }),
+  approvedAt: timestamp('approved_at', { withTimezone: true }),
+  rejectionReason: text('rejection_reason'),
+  sickNotePath: text('sick_note_path'), // document upload path
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_leave_req_org').on(table.orgId),
+  index('idx_leave_req_employee').on(table.employeeId),
+  index('idx_leave_req_status').on(table.status),
+  index('idx_leave_req_dates').on(table.startDate, table.endDate),
+  index('idx_leave_req_type').on(table.leaveTypeId),
+  index('idx_leave_req_manager').on(table.managerId),
+]);
+
+export const leaveRequestsRelations = relations(leaveRequests, ({ one }) => ({
+  organization: one(organizations, { fields: [leaveRequests.orgId], references: [organizations.id] }),
+  employee: one(employees, { fields: [leaveRequests.employeeId], references: [employees.id] }),
+  leaveType: one(leaveTypes, { fields: [leaveRequests.leaveTypeId], references: [leaveTypes.id] }),
+  manager: one(users, { fields: [leaveRequests.managerId], references: [users.id] }),
+  approver: one(users, { fields: [leaveRequests.approvedBy], references: [users.id] }),
+}));
+
+// Leave Balances
+export const leaveBalances = pgTable('leave_balances', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  employeeId: uuid('employee_id').notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  leaveTypeId: uuid('leave_type_id').notNull().references(() => leaveTypes.id, { onDelete: 'cascade' }),
+  totalEntitled: decimal('total_entitled', { precision: 5, scale: 2 }).default('0'),
+  accrued: decimal('accrued', { precision: 5, scale: 2 }).default('0'),
+  used: decimal('used', { precision: 5, scale: 2 }).default('0'),
+  pending: decimal('pending', { precision: 5, scale: 2 }).default('0'),
+  remaining: decimal('remaining', { precision: 5, scale: 2 }).default('0'),
+  carryOver: decimal('carry_over', { precision: 5, scale: 2 }).default('0'),
+  year: integer('year').notNull().default(2026),
+  lastAccruedAt: timestamp('last_accrued_at', { withTimezone: true }),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  uniqueIndex('idx_balance_emp_type_year').on(table.employeeId, table.leaveTypeId, table.year),
+  index('idx_balance_org').on(table.orgId),
+  index('idx_balance_employee').on(table.employeeId),
+]);
+
+export const leaveBalancesRelations = relations(leaveBalances, ({ one }) => ({
+  organization: one(organizations, { fields: [leaveBalances.orgId], references: [organizations.id] }),
+  employee: one(employees, { fields: [leaveBalances.employeeId], references: [employees.id] }),
+  leaveType: one(leaveTypes, { fields: [leaveBalances.leaveTypeId], references: [leaveTypes.id] }),
+}));
+
+// Holiday Calendars
+export const holidayCalendars = pgTable('holiday_calendars', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  date: date('date').notNull(),
+  type: varchar('type', { length: 50 }).default('public'), // public, company, floating, religious
+  country: varchar('country', { length: 100 }),
+  state: varchar('state', { length: 100 }),
+  isPaid: boolean('is_paid').default(true),
+  isRecurring: boolean('is_recurring').default(true), // repeats annually
+  description: text('description'),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_holiday_org').on(table.orgId),
+  index('idx_holiday_date').on(table.date),
+  index('idx_holiday_country').on(table.country),
+]);
+
+export const holidayCalendarsRelations = relations(holidayCalendars, ({ one }) => ({
+  organization: one(organizations, { fields: [holidayCalendars.orgId], references: [organizations.id] }),
+}));
+
+// Shift Assignments
+export const shiftAssignments = pgTable('shift_assignments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  employeeId: uuid('employee_id').notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  scheduleId: uuid('schedule_id').notNull().references(() => workSchedules.id, { onDelete: 'cascade' }),
+  effectiveDate: date('effective_date').notNull(),
+  endDate: date('end_date'),
+  isActive: boolean('is_active').default(true),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_shift_assign_org').on(table.orgId),
+  index('idx_shift_assign_employee').on(table.employeeId),
+  index('idx_shift_assign_schedule').on(table.scheduleId),
+]);
+
+export const shiftAssignmentsRelations = relations(shiftAssignments, ({ one }) => ({
+  organization: one(organizations, { fields: [shiftAssignments.orgId], references: [organizations.id] }),
+  employee: one(employees, { fields: [shiftAssignments.employeeId], references: [employees.id] }),
+  schedule: one(workSchedules, { fields: [shiftAssignments.scheduleId], references: [workSchedules.id] }),
+}));
+
+// Shift Swaps
+export const shiftSwaps = pgTable('shift_swaps', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  requesterId: uuid('requester_id').notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  recipientId: uuid('recipient_id').notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  requesterScheduleId: uuid('requester_schedule_id').notNull().references(() => workSchedules.id, { onDelete: 'cascade' }),
+  recipientScheduleId: uuid('recipient_schedule_id').notNull().references(() => workSchedules.id, { onDelete: 'cascade' }),
+  swapDate: date('swap_date').notNull(),
+  status: shiftSwapStatusEnum('status').default('pending'),
+  reason: text('reason'),
+  approvedBy: uuid('approved_by').references(() => users.id, { onDelete: 'set null' }),
+  approvedAt: timestamp('approved_at', { withTimezone: true }),
+  metadata: jsonb('metadata').default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_swap_org').on(table.orgId),
+  index('idx_swap_requester').on(table.requesterId),
+  index('idx_swap_recipient').on(table.recipientId),
+  index('idx_swap_status').on(table.status),
+  index('idx_swap_date').on(table.swapDate),
+]);
+
+export const shiftSwapsRelations = relations(shiftSwaps, ({ one }) => ({
+  organization: one(organizations, { fields: [shiftSwaps.orgId], references: [organizations.id] }),
+  requester: one(employees, { fields: [shiftSwaps.requesterId], references: [employees.id] }),
+  recipient: one(employees, { fields: [shiftSwaps.recipientId], references: [employees.id] }),
+  requesterSchedule: one(workSchedules, { fields: [shiftSwaps.requesterScheduleId], references: [workSchedules.id] }),
+  recipientSchedule: one(workSchedules, { fields: [shiftSwaps.recipientScheduleId], references: [workSchedules.id] }),
+  approver: one(users, { fields: [shiftSwaps.approvedBy], references: [users.id] }),
 }));
 

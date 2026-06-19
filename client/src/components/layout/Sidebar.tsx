@@ -27,6 +27,9 @@ import {
   Bell,
   Activity,
   Import,
+  Clock,
+  Calendar,
+  ClipboardList,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -115,6 +118,23 @@ const navItems: NavItem[] = [
     subItems: [
       { label: '1099 List', path: '/form1099' },
       { label: 'Generate 1099', path: '/form1099/generate' },
+    ],
+  },
+  {
+    label: 'Timekeeping',
+    icon: <Clock size={18} />,
+    subItems: [
+      { label: 'My Dashboard', path: '/timekeeping' },
+      { label: 'My Timesheets', path: '/timekeeping/timesheets' },
+      { label: 'My PTO', path: '/timekeeping/pto' },
+      { label: 'My Projects', path: '/timekeeping/projects' },
+      { label: 'Team Presence', path: '/timekeeping/team' },
+      { label: 'Approvals', path: '/timekeeping/approvals' },
+      { label: 'Team Calendar', path: '/timekeeping/team-calendar' },
+      { label: 'Admin: Schedules', path: '/timekeeping/admin/schedules' },
+      { label: 'Admin: Leave Policies', path: '/timekeeping/admin/leave-policies' },
+      { label: 'Admin: Holidays', path: '/timekeeping/admin/holidays' },
+      { label: 'Admin: Projects', path: '/timekeeping/admin/projects' },
     ],
   },
   { label: 'Documents', icon: <FolderOpen size={18} />, path: '/documents' },

@@ -4,10 +4,12 @@ import {
   organizations, users, chartOfAccounts, bankAccounts, taxYears,
   complianceCategories, documentTemplates, pipelineStages, programs, leadSources,
   contacts, employees, invoices, invoiceLines, payments, recurringTransactions,
-  expenseReports, expenseItems, form1099s, plans, subscriptions,
+  expenseReports, expenseItems, form1099s, plans, subscriptions, workSchedules,
+  timeEntries, attendanceRecords, timesheets, timesheetEntries, projects, projectTasks, projectTimeEntries,
+  leaveTypes, leaveRequests, leaveBalances, holidayCalendars,
 } from './schema.js';
 import { authService } from '../services/auth.js';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 async function seed() {
   console.log('Starting seed...');
@@ -219,6 +221,11 @@ async function seed() {
 
   // 5. Create tax year
   const currentYear = new Date().getFullYear();
+  const today = new Date();
+  const oneWeekAgo = new Date(today);
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  const twoWeeksAgo = new Date(today);
+  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
   const [taxYear] = await db.insert(taxYears).values({
     orgId: org.id,
     year: currentYear,
@@ -418,6 +425,376 @@ async function seed() {
     paymentCount: 2,
   }).returning();
   console.log('Created Form 1099-NEC for', vendor.fullName);
+
+  // ===== 14. TIMEKEEPING MODULE SEED DATA =====
+
+  // 14.1 Create more employees for team presence
+  const employeeData = [
+    { employeeId: 'EMP-002', firstName: 'John', lastName: 'Doe', email: 'john@democompany.com', jobTitle: 'Software Engineer', department: 'Engineering', hireDate: '2023-03-01', status: 'active', employmentType: 'full_time', payType: 'salary', payRate: '90000', payFrequency: 'biweekly' },
+    { employeeId: 'EMP-003', firstName: 'Sarah', lastName: 'Johnson', email: 'sarah@democompany.com', jobTitle: 'HR Specialist', department: 'Human Resources', hireDate: '2023-06-15', status: 'active', employmentType: 'full_time', payType: 'salary', payRate: '65000', payFrequency: 'biweekly' },
+    { employeeId: 'EMP-004', firstName: 'Mike', lastName: 'Brown', email: 'mike@democompany.com', jobTitle: 'Product Designer', department: 'Design', hireDate: '2023-09-01', status: 'active', employmentType: 'full_time', payType: 'salary', payRate: '80000', payFrequency: 'biweekly' },
+  ];
+
+  const createdEmployees = [employee];
+  for (const emp of employeeData) {
+    const [e] = await db.insert(employees).values({
+      orgId: org.id,
+      ...emp,
+    }).returning();
+    createdEmployees.push(e);
+  }
+  console.log('Created', createdEmployees.length, 'employees');
+
+  // 14.2 Create work schedule
+  const [schedule] = await db.insert(workSchedules).values({
+    orgId: org.id,
+    name: 'Standard Week',
+    shiftStart: '09:00',
+    shiftEnd: '17:00',
+    breakDuration: 60,
+    workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+    dailyOvertimeThreshold: 8,
+    weeklyOvertimeThreshold: 40,
+    gracePeriod: 15,
+    roundingInterval: 15,
+    isActive: true,
+  }).returning();
+  console.log('Created work schedule:', schedule.name);
+
+  // 14.3 Create time entries (clock in/out for past 5 days)
+  const timeEntryData = [];
+  for (let dayOffset = 4; dayOffset >= 0; dayOffset--) {
+    const day = new Date(today);
+    day.setDate(day.getDate() - dayOffset);
+    if (day.getDay() === 0 || day.getDay() === 6) continue; // Skip weekends
+    const dateStr = day.toISOString().split('T')[0];
+    for (const emp of createdEmployees) {
+      // Clock in at 9:00
+      const [entryIn] = await db.insert(timeEntries).values({
+        orgId: org.id,
+        employeeId: emp.id,
+        entryDate: dateStr,
+        entryType: 'clock_in',
+        timeStamp: new Date(`${dateStr}T09:00:00Z`),
+        location: 'Office',
+        device: 'Web',
+      }).returning();
+      // Start break at 12:30
+      await db.insert(timeEntries).values({
+        orgId: org.id,
+        employeeId: emp.id,
+        entryDate: dateStr,
+        entryType: 'break_start',
+        timeStamp: new Date(`${dateStr}T12:30:00Z`),
+      });
+      // End break at 13:30
+      await db.insert(timeEntries).values({
+        orgId: org.id,
+        employeeId: emp.id,
+        entryDate: dateStr,
+        entryType: 'break_end',
+        timeStamp: new Date(`${dateStr}T13:30:00Z`),
+      });
+      // Clock out at 17:00 (or 18:00 for some overtime)
+      const outTime = emp.id === createdEmployees[0].id ? '18:00' : '17:00';
+      await db.insert(timeEntries).values({
+        orgId: org.id,
+        employeeId: emp.id,
+        entryDate: dateStr,
+        entryType: 'clock_out',
+        timeStamp: new Date(`${dateStr}T${outTime}:00Z`),
+      });
+      // Project time entry for some employees
+      if (emp.id === createdEmployees[0].id || emp.id === createdEmployees[3].id) {
+        await db.insert(timeEntries).values({
+          orgId: org.id,
+          employeeId: emp.id,
+          entryDate: dateStr,
+          entryType: 'project_time',
+          timeStamp: new Date(`${dateStr}T14:00:00Z`),
+        });
+      }
+    }
+  }
+  console.log('Created time entries for past 5 weekdays');
+
+  // 14.4 Create attendance records
+  for (let dayOffset = 4; dayOffset >= 0; dayOffset--) {
+    const day = new Date(today);
+    day.setDate(day.getDate() - dayOffset);
+    if (day.getDay() === 0 || day.getDay() === 6) continue;
+    const dateStr = day.toISOString().split('T')[0];
+    for (const emp of createdEmployees) {
+      const isLate = emp.id === createdEmployees[1].id;
+      const isOvertime = emp.id === createdEmployees[0].id;
+      const inTime = isLate ? '09:20' : '09:00';
+      const outTime = isOvertime ? '18:00' : '17:00';
+      const regularHours = isOvertime ? '8' : '8';
+      const overtimeHours = isOvertime ? '1' : '0';
+      await db.insert(attendanceRecords).values({
+        orgId: org.id,
+        employeeId: emp.id,
+        date: dateStr,
+        status: 'present',
+        clockIn: inTime,
+        clockOut: outTime,
+        breakDuration: 60,
+        regularHours,
+        overtimeHours,
+        totalHours: isOvertime ? '9' : '8',
+        isLate,
+        isOvertime: isOvertime,
+      });
+    }
+  }
+  console.log('Created attendance records');
+
+  // 14.5 Create timesheets (last 2 weeks)
+  for (let w = 0; w < 2; w++) {
+    const weekStart = new Date(today);
+    weekStart.setDate(weekStart.getDate() - (weekStart.getDay() || 7) + 1 - (w * 7));
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    const weekStartStr = weekStart.toISOString().split('T')[0];
+    const weekEndStr = weekEnd.toISOString().split('T')[0];
+    for (const emp of createdEmployees) {
+      const [ts] = await db.insert(timesheets).values({
+        orgId: org.id,
+        employeeId: emp.id,
+        weekStartDate: weekStartStr,
+        weekEndDate: weekEndStr,
+        totalHours: w === 0 ? '40' : '40',
+        regularHours: '40',
+        overtimeHours: '0',
+        breakHours: '5',
+        billableHours: emp.id === createdEmployees[0].id ? '20' : '0',
+        status: w === 0 ? 'draft' : 'approved',
+      }).returning();
+      // Add daily entries for Mon-Fri
+      for (let d = 0; d < 5; d++) {
+        const day = new Date(weekStart);
+        day.setDate(day.getDate() + d);
+        const dayStr = day.toISOString().split('T')[0];
+        await db.insert(timesheetEntries).values({
+          orgId: org.id,
+          timesheetId: ts.id,
+          employeeId: emp.id,
+          date: dayStr,
+          clockIn: '09:00',
+          clockOut: '17:00',
+          breakDuration: 60,
+          regularHours: '8',
+          overtimeHours: '0',
+          totalHours: '8',
+        });
+      }
+    }
+  }
+  console.log('Created timesheets for 2 weeks');
+
+  // 14.6 Create leave types
+  const leaveTypeData = [
+    { name: 'Vacation', type: 'vacation', isPaid: true, requiresApproval: true, maxDaysPerYear: 15, accrualRate: '1.25', accrualPeriod: 'monthly', carryOverLimit: 5, useItOrLoseIt: false },
+    { name: 'Sick Leave', type: 'sick', isPaid: true, requiresApproval: false, maxDaysPerYear: 10, accrualRate: '0.83', accrualPeriod: 'monthly', carryOverLimit: 0, useItOrLoseIt: true },
+    { name: 'Personal Day', type: 'personal', isPaid: true, requiresApproval: true, maxDaysPerYear: 5, accrualRate: '0.42', accrualPeriod: 'monthly', carryOverLimit: 2, useItOrLoseIt: false },
+    { name: 'Maternity Leave', type: 'maternity', isPaid: true, requiresApproval: true, maxDaysPerYear: 60, carryOverLimit: 0, useItOrLoseIt: false },
+    { name: 'Bereavement', type: 'bereavement', isPaid: true, requiresApproval: true, maxDaysPerYear: 5, carryOverLimit: 0, useItOrLoseIt: false },
+  ];
+
+  const createdLeaveTypes = [];
+  for (const lt of leaveTypeData) {
+    const [created] = await db.insert(leaveTypes).values({
+      orgId: org.id,
+      ...lt,
+    }).returning();
+    createdLeaveTypes.push(created);
+  }
+  console.log('Created', createdLeaveTypes.length, 'leave types');
+
+  // 14.7 Create leave balances for each employee
+  for (const emp of createdEmployees) {
+    for (const lt of createdLeaveTypes) {
+      await db.insert(leaveBalances).values({
+        orgId: org.id,
+        employeeId: emp.id,
+        leaveTypeId: lt.id,
+        year: currentYear,
+        totalEntitled: lt.maxDaysPerYear?.toString() || '0',
+        accrued: (lt.maxDaysPerYear || 0).toString(),
+        used: '0',
+        pending: '0',
+        carryOver: '0',
+        remaining: (lt.maxDaysPerYear || 0).toString(),
+      });
+    }
+  }
+  console.log('Created leave balances');
+
+  // 14.8 Create leave requests
+  // Pending request
+  const [pendingRequest] = await db.insert(leaveRequests).values({
+    orgId: org.id,
+    employeeId: createdEmployees[0].id,
+    leaveTypeId: createdLeaveTypes[0].id,
+    startDate: `${currentYear}-07-15`,
+    endDate: `${currentYear}-07-18`,
+    daysRequested: '4',
+    isHalfDay: false,
+    reason: 'Family vacation to Florida',
+    status: 'pending',
+  }).returning();
+  // Update balance pending
+  await db.update(leaveBalances).set({
+    pending: '4',
+    remaining: sql`CAST(${leaveBalances.remaining} AS NUMERIC) - 4`,
+  }).where(eq(leaveBalances.employeeId, createdEmployees[0].id)).where(eq(leaveBalances.leaveTypeId, createdLeaveTypes[0].id));
+
+  // Approved request
+  const [approvedRequest] = await db.insert(leaveRequests).values({
+    orgId: org.id,
+    employeeId: createdEmployees[1].id,
+    leaveTypeId: createdLeaveTypes[0].id,
+    startDate: `${currentYear}-06-01`,
+    endDate: `${currentYear}-06-05`,
+    daysRequested: '5',
+    isHalfDay: false,
+    reason: 'Summer vacation',
+    status: 'approved',
+    approvedBy: owner.id,
+    approvedAt: new Date(`${currentYear}-05-15T10:00:00Z`),
+  }).returning();
+  // Update balance used
+  await db.update(leaveBalances).set({
+    used: '5',
+    remaining: sql`CAST(${leaveBalances.remaining} AS NUMERIC) - 5`,
+  }).where(eq(leaveBalances.employeeId, createdEmployees[1].id)).where(eq(leaveBalances.leaveTypeId, createdLeaveTypes[0].id));
+
+  // Rejected request
+  await db.insert(leaveRequests).values({
+    orgId: org.id,
+    employeeId: createdEmployees[2].id,
+    leaveTypeId: createdLeaveTypes[1].id,
+    startDate: `${currentYear}-05-20`,
+    endDate: `${currentYear}-05-21`,
+    daysRequested: '2',
+    isHalfDay: false,
+    reason: 'Not feeling well',
+    status: 'rejected',
+    rejectionReason: 'Insufficient documentation provided',
+  });
+  console.log('Created 3 leave requests (pending, approved, rejected)');
+
+  // 14.9 Create holidays
+  const holidayData = [
+    { date: `${currentYear}-01-01`, name: 'New Year\'s Day', type: 'public', country: 'US', state: 'ALL', isPaid: true, isRecurring: true },
+    { date: `${currentYear}-07-04`, name: 'Independence Day', type: 'public', country: 'US', state: 'ALL', isPaid: true, isRecurring: true },
+    { date: `${currentYear}-12-25`, name: 'Christmas Day', type: 'public', country: 'US', state: 'ALL', isPaid: true, isRecurring: true },
+    { date: `${currentYear}-11-28`, name: 'Thanksgiving Day', type: 'public', country: 'US', state: 'ALL', isPaid: true, isRecurring: true },
+    { date: `${currentYear}-09-01`, name: 'Labor Day', type: 'public', country: 'US', state: 'ALL', isPaid: true, isRecurring: true },
+  ];
+  for (const h of holidayData) {
+    await db.insert(holidayCalendars).values({
+      orgId: org.id,
+      ...h,
+    });
+  }
+  console.log('Created', holidayData.length, 'holidays');
+
+  // 14.10 Create projects
+  const [project1] = await db.insert(projects).values({
+    orgId: org.id,
+    name: 'Website Redesign',
+    description: 'Complete redesign of company website with new CMS',
+    clientId: customer.id,
+    managerId: owner.id,
+    status: 'active',
+    budgetHours: '200',
+    hourlyRate: '75',
+    isBillable: true,
+    startDate: `${currentYear}-01-01`,
+    endDate: `${currentYear}-06-30`,
+    color: '#3B82F6',
+  }).returning();
+
+  const [project2] = await db.insert(projects).values({
+    orgId: org.id,
+    name: 'Internal CRM Upgrade',
+    description: 'Internal tools and CRM system upgrade project',
+    managerId: owner.id,
+    status: 'active',
+    budgetHours: '500',
+    hourlyRate: '0',
+    isBillable: false,
+    startDate: `${currentYear}-01-15`,
+    endDate: `${currentYear}-12-31`,
+    color: '#10B981',
+  }).returning();
+  console.log('Created 2 projects');
+
+  // 14.11 Create project tasks
+  const taskData = [
+    { projectId: project1.id, name: 'Design mockups', description: 'Create initial design mockups', estimatedHours: '40', dueDate: `${currentYear}-02-15`, status: 'in_progress', assignedTo: createdEmployees[3].id },
+    { projectId: project1.id, name: 'Frontend development', description: 'Build React frontend', estimatedHours: '100', dueDate: `${currentYear}-04-30`, status: 'todo', assignedTo: createdEmployees[0].id },
+    { projectId: project1.id, name: 'Content migration', description: 'Migrate existing content', estimatedHours: '60', dueDate: `${currentYear}-05-15`, status: 'todo', assignedTo: createdEmployees[1].id },
+    { projectId: project2.id, name: 'Database migration', description: 'Migrate to new database schema', estimatedHours: '80', dueDate: `${currentYear}-03-30`, status: 'in_progress', assignedTo: createdEmployees[0].id },
+    { projectId: project2.id, name: 'API integration', description: 'Build REST API endpoints', estimatedHours: '120', dueDate: `${currentYear}-06-30`, status: 'todo', assignedTo: createdEmployees[0].id },
+  ];
+  const createdTasks = [];
+  for (const t of taskData) {
+    const [task] = await db.insert(projectTasks).values({
+      orgId: org.id,
+      ...t,
+    }).returning();
+    createdTasks.push(task);
+  }
+  console.log('Created', createdTasks.length, 'project tasks');
+
+  // 14.12 Create project time entries
+  for (let dayOffset = 4; dayOffset >= 0; dayOffset--) {
+    const day = new Date(today);
+    day.setDate(day.getDate() - dayOffset);
+    if (day.getDay() === 0 || day.getDay() === 6) continue;
+    const dateStr = day.toISOString().split('T')[0];
+    // Project 1 entries (designer + engineer)
+    await db.insert(projectTimeEntries).values({
+      orgId: org.id,
+      employeeId: createdEmployees[3].id,
+      projectId: project1.id,
+      taskId: createdTasks[0].id,
+      date: dateStr,
+      hours: '3',
+      isBillable: true,
+      hourlyRate: '75',
+      totalAmount: '225',
+      description: 'Design mockup work',
+    });
+    await db.insert(projectTimeEntries).values({
+      orgId: org.id,
+      employeeId: createdEmployees[0].id,
+      projectId: project1.id,
+      taskId: createdTasks[1].id,
+      date: dateStr,
+      hours: '2',
+      isBillable: true,
+      hourlyRate: '75',
+      totalAmount: '150',
+      description: 'Frontend setup and component library',
+    });
+    // Project 2 entries (engineer)
+    await db.insert(projectTimeEntries).values({
+      orgId: org.id,
+      employeeId: createdEmployees[0].id,
+      projectId: project2.id,
+      taskId: createdTasks[3].id,
+      date: dateStr,
+      hours: '2',
+      isBillable: false,
+      hourlyRate: '0',
+      totalAmount: '0',
+      description: 'Schema design and migration planning',
+    });
+  }
+  console.log('Created project time entries');
 
   console.log('\nSeed complete!');
   console.log('Login with: admin@democompany.com / admin123');
