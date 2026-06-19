@@ -109,6 +109,15 @@ export const taskRouter = router({
       });
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND', message: 'Task not found' });
       
+      if (ctx.user.role !== 'admin') {
+        if (existing.assignedTo !== ctx.user.id && existing.createdBy !== ctx.user.id) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You can only update tasks assigned to you or created by you',
+          });
+        }
+      }
+      
       const updateData: any = { ...updates };
       if (updates.dueAt) updateData.dueAt = new Date(updates.dueAt);
       if (updates.status === 'done') {
@@ -119,7 +128,7 @@ export const taskRouter = router({
       
       const [updated] = await db.update(tasks)
         .set(updateData)
-        .where(eq(tasks.id, id))
+        .where(and(eq(tasks.id, id), eq(tasks.orgId, ctx.orgId!)))
         .returning();
       
       await auditService.logUpdate(
@@ -142,7 +151,16 @@ export const taskRouter = router({
       });
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND', message: 'Task not found' });
       
-      await db.delete(tasks).where(eq(tasks.id, input.id));
+      if (ctx.user.role !== 'admin') {
+        if (existing.assignedTo !== ctx.user.id && existing.createdBy !== ctx.user.id) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You can only delete tasks assigned to you or created by you',
+          });
+        }
+      }
+      
+      await db.delete(tasks).where(and(eq(tasks.id, input.id), eq(tasks.orgId, ctx.orgId!)));
       
       await auditService.logDelete(
         ctx.orgId!,

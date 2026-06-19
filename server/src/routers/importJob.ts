@@ -167,7 +167,7 @@ export const importJobRouter = router({
       const [updated] = await db
         .update(importJobs)
         .set({ ...updates, updatedAt: new Date() })
-        .where(eq(importJobs.id, id))
+        .where(and(eq(importJobs.id, id), eq(importJobs.orgId, ctx.orgId!)))
         .returning();
 
       await auditService.logUpdate(
@@ -334,7 +334,7 @@ export const importJobRouter = router({
 
       await db
         .delete(importJobs)
-        .where(eq(importJobs.id, input.id));
+        .where(and(eq(importJobs.id, input.id), eq(importJobs.orgId, ctx.orgId!)));
 
       await auditService.logDelete(
         ctx.orgId!,

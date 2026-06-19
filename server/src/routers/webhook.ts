@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { eq, and, or, ilike, desc, count, gte, lte, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { router, protectedProcedure } from '../trpc.js';
+import { router, protectedProcedure, adminProcedure } from '../trpc.js';
 import { db } from '../db/index.js';
 import { webhookEndpoints, webhookEvents } from '../db/schema.js';
 import { auditService } from '../services/audit.js';
@@ -131,7 +131,7 @@ export const webhookRouter = router({
     }),
 
   // ── 3. createEndpoint ─────────────────────
-  createEndpoint: protectedProcedure
+  createEndpoint: adminProcedure
     .input(createEndpointInput)
     .mutation(async ({ ctx, input }) => {
       const [endpoint] = await db
@@ -162,7 +162,7 @@ export const webhookRouter = router({
     }),
 
   // ── 4. updateEndpoint ─────────────────────
-  updateEndpoint: protectedProcedure
+  updateEndpoint: adminProcedure
     .input(updateEndpointInput)
     .mutation(async ({ ctx, input }) => {
       const { id, ...updates } = input;
@@ -214,7 +214,7 @@ export const webhookRouter = router({
     }),
 
   // ── 5. deleteEndpoint ─────────────────────
-  deleteEndpoint: protectedProcedure
+  deleteEndpoint: adminProcedure
     .input(deleteEndpointInput)
     .mutation(async ({ ctx, input }) => {
       const existing = await db.query.webhookEndpoints.findFirst({

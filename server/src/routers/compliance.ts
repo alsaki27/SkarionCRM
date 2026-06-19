@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { router, protectedProcedure } from '../trpc.js';
+import { router, protectedProcedure, adminProcedure } from '../trpc.js';
 import { db } from '../db/index.js';
 import { complianceCategories, complianceItems, complianceDocuments } from '../db/schema.js';
 import { eq, and, or, ilike, desc, count, gte, lte, sql } from 'drizzle-orm';
@@ -53,7 +53,7 @@ export const complianceRouter = router({
       return { items, total: totalResult[0]?.count ?? 0 };
     }),
 
-  createCategory: protectedProcedure
+  createCategory: adminProcedure
     .input(
       z.object({
         name: z.string().min(1).max(255),
@@ -85,7 +85,7 @@ export const complianceRouter = router({
       return category;
     }),
 
-  updateCategory: protectedProcedure
+  updateCategory: adminProcedure
     .input(
       z.object({
         id: z.string().uuid(),
@@ -108,7 +108,7 @@ export const complianceRouter = router({
       const [updated] = await db
         .update(complianceCategories)
         .set({ ...updates, updatedAt: new Date() })
-        .where(eq(complianceCategories.id, id))
+        .where(and(eq(complianceCategories.id, id), eq(complianceCategories.orgId, ctx.orgId!)))
         .returning();
 
       await auditService.logUpdate(
@@ -192,7 +192,7 @@ export const complianceRouter = router({
       return { items, total: totalResult[0]?.count ?? 0 };
     }),
 
-  createItem: protectedProcedure
+  createItem: adminProcedure
     .input(
       z.object({
         categoryId: z.string().uuid().optional(),
@@ -244,7 +244,7 @@ export const complianceRouter = router({
       return item;
     }),
 
-  updateItem: protectedProcedure
+  updateItem: adminProcedure
     .input(
       z.object({
         id: z.string().uuid(),
@@ -283,7 +283,7 @@ export const complianceRouter = router({
       const [updated] = await db
         .update(complianceItems)
         .set(setData)
-        .where(eq(complianceItems.id, id))
+        .where(and(eq(complianceItems.id, id), eq(complianceItems.orgId, ctx.orgId!)))
         .returning();
 
       await auditService.logUpdate(
@@ -345,7 +345,7 @@ export const complianceRouter = router({
           evidenceFiles: [...existingFiles, newFile],
           updatedAt: new Date(),
         })
-        .where(eq(complianceItems.id, input.complianceItemId));
+        .where(and(eq(complianceItems.id, input.complianceItemId), eq(complianceItems.orgId, ctx.orgId!)));
 
       await auditService.logCreate(ctx.orgId!, ctx.user.id, 'compliance_document', doc.id, {
         complianceItemId: doc.complianceItemId,

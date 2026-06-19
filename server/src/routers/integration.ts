@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { eq, and, or, ilike, desc, count } from 'drizzle-orm';
-import { router, protectedProcedure } from '../trpc.js';
+import { router, protectedProcedure, adminProcedure } from '../trpc.js';
 import { db } from '../db/index.js';
 import { integrations } from '../db/schema.js';
 import { auditService } from '../services/audit.js';
@@ -84,7 +84,7 @@ export const integrationRouter = router({
       return integration;
     }),
 
-  createIntegration: protectedProcedure
+  createIntegration: adminProcedure
     .input(
       z.object({
         name: z.string().min(1).max(255),
@@ -135,7 +135,7 @@ export const integrationRouter = router({
       return integration;
     }),
 
-  updateIntegration: protectedProcedure
+  updateIntegration: adminProcedure
     .input(
       z.object({
         id: z.string().uuid(),
@@ -169,7 +169,7 @@ export const integrationRouter = router({
       const [updated] = await db
         .update(integrations)
         .set({ ...updates, updatedAt: new Date() })
-        .where(eq(integrations.id, id))
+        .where(and(eq(integrations.id, id), eq(integrations.orgId, ctx.orgId!)))
         .returning();
 
       await auditService.logUpdate(
@@ -184,7 +184,7 @@ export const integrationRouter = router({
       return updated;
     }),
 
-  deleteIntegration: protectedProcedure
+  deleteIntegration: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
       const existing = await db.query.integrations.findFirst({
@@ -202,7 +202,7 @@ export const integrationRouter = router({
 
       await db
         .delete(integrations)
-        .where(eq(integrations.id, input.id));
+        .where(and(eq(integrations.id, input.id), eq(integrations.orgId, ctx.orgId!)));
 
       await auditService.logDelete(
         ctx.orgId!,
@@ -245,7 +245,7 @@ export const integrationRouter = router({
           lastSyncError: input.error || null,
           updatedAt: new Date(),
         })
-        .where(eq(integrations.id, input.id))
+        .where(and(eq(integrations.id, input.id), eq(integrations.orgId, ctx.orgId!)))
         .returning();
 
       await auditService.logUpdate(

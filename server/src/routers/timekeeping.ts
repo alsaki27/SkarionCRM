@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { eq, and, or, gte, lte, desc, count, sql, sum, isNull, asc, ne } from 'drizzle-orm';
-import { router, protectedProcedure } from '../trpc.js';
+import { router, protectedProcedure, adminProcedure } from '../trpc.js';
 import { db } from '../db/index.js';
 import {
   timeEntries,
@@ -209,12 +209,7 @@ export const timekeepingRouter = router({
         })
         .returning();
 
-      await auditService.logCreate({
-        ctx,
-        tableName: 'time_entries',
-        recordId: entry.id,
-        data: entry,
-      });
+      await auditService.logCreate(ctx.orgId!, ctx.user.id, 'time_entry', entry.id, entry);
 
       return entry;
     }),
@@ -307,12 +302,7 @@ export const timekeepingRouter = router({
         });
       }
 
-      await auditService.logCreate({
-        ctx,
-        tableName: 'time_entries',
-        recordId: clockOutEntry.id,
-        data: clockOutEntry,
-      });
+      await auditService.logCreate(ctx.orgId!, ctx.user.id, 'time_entry', clockOutEntry.id, clockOutEntry);
 
       return {
         clockIn: latestIn,
@@ -342,12 +332,7 @@ export const timekeepingRouter = router({
         })
         .returning();
 
-      await auditService.logCreate({
-        ctx,
-        tableName: 'time_entries',
-        recordId: entry.id,
-        data: entry,
-      });
+      await auditService.logCreate(ctx.orgId!, ctx.user.id, 'time_entry', entry.id, entry);
 
       return entry;
     }),
@@ -369,12 +354,7 @@ export const timekeepingRouter = router({
         })
         .returning();
 
-      await auditService.logCreate({
-        ctx,
-        tableName: 'time_entries',
-        recordId: entry.id,
-        data: entry,
-      });
+      await auditService.logCreate(ctx.orgId!, ctx.user.id, 'time_entry', entry.id, entry);
 
       return entry;
     }),
@@ -387,6 +367,10 @@ export const timekeepingRouter = router({
     .query(async ({ ctx, input }) => {
       const conditions = [eq(timeEntries.orgId, ctx.orgId!)];
       if (input.employeeId) conditions.push(eq(timeEntries.employeeId, input.employeeId));
+      if (ctx.user.role !== 'owner' && ctx.user.role !== 'admin') {
+        const currentEmployeeId = await getEmployeeIdFromCtx(ctx);
+        conditions.push(eq(timeEntries.employeeId, currentEmployeeId));
+      }
       if (input.entryType) conditions.push(eq(timeEntries.entryType, input.entryType));
       if (input.projectId) conditions.push(eq(timeEntries.projectId, input.projectId));
       if (input.dateFrom) conditions.push(gte(timeEntries.timestamp, startOfDay(input.dateFrom)));
@@ -440,6 +424,12 @@ export const timekeepingRouter = router({
       ];
       if (input.employeeId) attConditions.push(eq(attendanceRecords.employeeId, input.employeeId));
 
+      let currentEmployeeId: string | undefined;
+      if (ctx.user.role !== 'owner' && ctx.user.role !== 'admin') {
+        currentEmployeeId = await getEmployeeIdFromCtx(ctx);
+        attConditions.push(eq(attendanceRecords.employeeId, currentEmployeeId));
+      }
+
       const records = await db
         .select({
           record: attendanceRecords,
@@ -464,6 +454,7 @@ export const timekeepingRouter = router({
         lte(timeEntries.timestamp, end),
       ];
       if (input.employeeId) teConditions.push(eq(timeEntries.employeeId, input.employeeId));
+      if (currentEmployeeId) teConditions.push(eq(timeEntries.employeeId, currentEmployeeId));
 
       const entries = await db
         .select()
@@ -523,6 +514,10 @@ export const timekeepingRouter = router({
     .query(async ({ ctx, input }) => {
       const conditions = [eq(timesheets.orgId, ctx.orgId!)];
       if (input.employeeId) conditions.push(eq(timesheets.employeeId, input.employeeId));
+      if (ctx.user.role !== 'owner' && ctx.user.role !== 'admin') {
+        const currentEmployeeId = await getEmployeeIdFromCtx(ctx);
+        conditions.push(eq(timesheets.employeeId, currentEmployeeId));
+      }
       if (input.status) conditions.push(eq(timesheets.status, input.status));
       if (input.weekStart) conditions.push(gte(timesheets.weekStart, input.weekStart));
       if (input.weekEnd) conditions.push(lte(timesheets.weekEnd, input.weekEnd));
@@ -571,6 +566,10 @@ export const timekeepingRouter = router({
       if (!sheet) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Timesheet not found.' });
       }
+      const currentEmployeeId = await getEmployeeIdFromCtx(ctx);
+      if (sheet.employeeId !== currentEmployeeId) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'You can only submit your own timesheet.' });
+      }
       if (sheet.status !== 'draft' && sheet.status !== 'rejected') {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Timesheet can only be submitted from draft or rejected status.' });
       }
@@ -581,13 +580,7 @@ export const timekeepingRouter = router({
         .where(and(eq(timesheets.id, input.id), eq(timesheets.orgId, ctx.orgId!)))
         .returning();
 
-      await auditService.logUpdate({
-        ctx,
-        tableName: 'timesheets',
-        recordId: input.id,
-        oldData: sheet,
-        newData: updated,
-      });
+      await auditService.logUpdate(ctx.orgId!, ctx.user.id, 'timesheet', input.id, sheet, updated);
 
       const [employee] = await db
         .select()
@@ -612,7 +605,7 @@ export const timekeepingRouter = router({
   /* ================================================================ */
   /*  8. approveTimesheet                                              */
   /* ================================================================ */
-  approveTimesheet: protectedProcedure
+  approveTimesheet: adminProcedure
     .input(idWithNotesSchema)
     .mutation(async ({ ctx, input }) => {
       const [sheet] = await db
@@ -639,13 +632,7 @@ export const timekeepingRouter = router({
         .where(and(eq(timesheets.id, input.id), eq(timesheets.orgId, ctx.orgId!)))
         .returning();
 
-      await auditService.logUpdate({
-        ctx,
-        tableName: 'timesheets',
-        recordId: input.id,
-        oldData: sheet,
-        newData: updated,
-      });
+      await auditService.logUpdate(ctx.orgId!, ctx.user.id, 'timesheet', input.id, sheet, updated);
 
       await db.insert(notifications).values({
         orgId: ctx.orgId!,
@@ -661,7 +648,7 @@ export const timekeepingRouter = router({
   /* ================================================================ */
   /*  9. rejectTimesheet                                               */
   /* ================================================================ */
-  rejectTimesheet: protectedProcedure
+  rejectTimesheet: adminProcedure
     .input(rejectSchema)
     .mutation(async ({ ctx, input }) => {
       const [sheet] = await db
@@ -688,13 +675,7 @@ export const timekeepingRouter = router({
         .where(and(eq(timesheets.id, input.id), eq(timesheets.orgId, ctx.orgId!)))
         .returning();
 
-      await auditService.logUpdate({
-        ctx,
-        tableName: 'timesheets',
-        recordId: input.id,
-        oldData: sheet,
-        newData: updated,
-      });
+      await auditService.logUpdate(ctx.orgId!, ctx.user.id, 'timesheet', input.id, sheet, updated);
 
       await db.insert(notifications).values({
         orgId: ctx.orgId!,
@@ -713,6 +694,12 @@ export const timekeepingRouter = router({
   createTimesheet: protectedProcedure
     .input(createTimesheetSchema)
     .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== 'owner' && ctx.user.role !== 'admin') {
+        const currentEmployeeId = await getEmployeeIdFromCtx(ctx);
+        if (input.employeeId !== currentEmployeeId) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'You can only create timesheets for yourself.' });
+        }
+      }
       const weekStart = startOfDay(input.weekStart);
       const weekEnd = endOfDay(addDays(input.weekStart, 6));
 
@@ -792,12 +779,7 @@ export const timekeepingRouter = router({
         });
       }
 
-      await auditService.logCreate({
-        ctx,
-        tableName: 'timesheets',
-        recordId: sheet.id,
-        data: sheet,
-      });
+      await auditService.logCreate(ctx.orgId!, ctx.user.id, 'timesheet', sheet.id, sheet);
 
       return sheet;
     }),
@@ -836,29 +818,22 @@ export const timekeepingRouter = router({
   /* ================================================================ */
   /*  12. create / update / delete WorkSchedule                        */
   /* ================================================================ */
-  createWorkSchedule: protectedProcedure
+  createWorkSchedule: adminProcedure
     .input(workScheduleSchema)
     .mutation(async ({ ctx, input }) => {
-      isAdmin(ctx);
       const [schedule] = await db
         .insert(workSchedules)
         .values({ ...input, orgId: ctx.orgId! })
         .returning();
 
-      await auditService.logCreate({
-        ctx,
-        tableName: 'work_schedules',
-        recordId: schedule.id,
-        data: schedule,
-      });
+      await auditService.logCreate(ctx.orgId!, ctx.user.id, 'work_schedule', schedule.id, schedule);
 
       return schedule;
     }),
 
-  updateWorkSchedule: protectedProcedure
+  updateWorkSchedule: adminProcedure
     .input(z.object({ id: z.string() }).merge(workScheduleSchema.partial()))
     .mutation(async ({ ctx, input }) => {
-      isAdmin(ctx);
       const { id, ...data } = input;
 
       const [existing] = await db
@@ -875,21 +850,14 @@ export const timekeepingRouter = router({
         .where(and(eq(workSchedules.id, id), eq(workSchedules.orgId, ctx.orgId!)))
         .returning();
 
-      await auditService.logUpdate({
-        ctx,
-        tableName: 'work_schedules',
-        recordId: id,
-        oldData: existing,
-        newData: updated,
-      });
+      await auditService.logUpdate(ctx.orgId!, ctx.user.id, 'work_schedule', id, existing, updated);
 
       return updated;
     }),
 
-  deleteWorkSchedule: protectedProcedure
+  deleteWorkSchedule: adminProcedure
     .input(idSchema)
     .mutation(async ({ ctx, input }) => {
-      isAdmin(ctx);
       const [existing] = await db
         .select()
         .from(workSchedules)
@@ -902,12 +870,7 @@ export const timekeepingRouter = router({
         .delete(workSchedules)
         .where(and(eq(workSchedules.id, input.id), eq(workSchedules.orgId, ctx.orgId!)));
 
-      await auditService.logDelete({
-        ctx,
-        tableName: 'work_schedules',
-        recordId: input.id,
-        oldData: existing,
-      });
+      await auditService.logDelete(ctx.orgId!, ctx.user.id, 'work_schedule', input.id, existing);
 
       return { success: true };
     }),
@@ -953,12 +916,7 @@ export const timekeepingRouter = router({
         })
         .returning();
 
-      await auditService.logCreate({
-        ctx,
-        tableName: 'shift_assignments',
-        recordId: assignment.id,
-        data: assignment,
-      });
+      await auditService.logCreate(ctx.orgId!, ctx.user.id, 'shift_assignment', assignment.id, assignment);
 
       return assignment;
     }),
@@ -983,12 +941,7 @@ export const timekeepingRouter = router({
         })
         .returning();
 
-      await auditService.logCreate({
-        ctx,
-        tableName: 'shift_swaps',
-        recordId: swap.id,
-        data: swap,
-      });
+      await auditService.logCreate(ctx.orgId!, ctx.user.id, 'shift_swap', swap.id, swap);
 
       await db.insert(notifications).values({
         orgId: ctx.orgId!,
@@ -1022,13 +975,7 @@ export const timekeepingRouter = router({
         .where(and(eq(shiftSwaps.id, input.id), eq(shiftSwaps.orgId, ctx.orgId!)))
         .returning();
 
-      await auditService.logUpdate({
-        ctx,
-        tableName: 'shift_swaps',
-        recordId: input.id,
-        oldData: swap,
-        newData: updated,
-      });
+      await auditService.logUpdate(ctx.orgId!, ctx.user.id, 'shift_swap', input.id, swap, updated);
 
       await db.insert(notifications).values({
         orgId: ctx.orgId!,
@@ -1067,13 +1014,7 @@ export const timekeepingRouter = router({
         .where(and(eq(shiftSwaps.id, input.id), eq(shiftSwaps.orgId, ctx.orgId!)))
         .returning();
 
-      await auditService.logUpdate({
-        ctx,
-        tableName: 'shift_swaps',
-        recordId: input.id,
-        oldData: swap,
-        newData: updated,
-      });
+      await auditService.logUpdate(ctx.orgId!, ctx.user.id, 'shift_swap', input.id, swap, updated);
 
       await db.insert(notifications).values({
         orgId: ctx.orgId!,

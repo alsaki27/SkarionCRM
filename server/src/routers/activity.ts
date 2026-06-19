@@ -1,9 +1,9 @@
-import { z } from "zod";
-import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure } from "../trpc.js";
-import { eq, and, or, desc, count, gte, lte, ilike } from "drizzle-orm";
-import { activityLogs } from "../db/schema.js";
-import { auditService } from "../services/auditService.js";
+import { z } from 'zod';
+import { router, protectedProcedure } from '../trpc.js';
+import { eq, and, or, desc, count, gte, lte, ilike } from 'drizzle-orm';
+import { activityLogs } from '../db/schema.js';
+import { auditService } from '../services/audit.js';
+import { db } from '../db/index.js';
 
 export const activityRouter = router({
   listActivities: protectedProcedure
@@ -56,14 +56,14 @@ export const activityRouter = router({
       const whereClause = conditions.length > 1 ? and(...conditions) : conditions[0];
 
       const [items, totalResult] = await Promise.all([
-        ctx.db
+        db
           .select()
           .from(activityLogs)
           .where(whereClause)
           .orderBy(desc(activityLogs.createdAt))
           .limit(input.pageSize)
           .offset(offset),
-        ctx.db
+        db
           .select({ value: count() })
           .from(activityLogs)
           .where(whereClause),
@@ -87,7 +87,7 @@ export const activityRouter = router({
     const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const rows = await ctx.db
+    const rows = await db
       .select()
       .from(activityLogs)
       .where(
@@ -132,13 +132,13 @@ export const activityRouter = router({
         | { headers?: Record<string, string | string[]>; ip?: string }
         | undefined;
       const ip =
-        req?.headers?.["x-forwarded-for"]?.toString() ||
-        req?.headers?.["x-real-ip"]?.toString() ||
+        req?.headers?.['x-forwarded-for']?.toString() ||
+        req?.headers?.['x-real-ip']?.toString() ||
         req?.ip ||
-        "";
-      const userAgent = req?.headers?.["user-agent"]?.toString() || "";
+        '';
+      const userAgent = req?.headers?.['user-agent']?.toString() || '';
 
-      const [created] = await ctx.db
+      const [created] = await db
         .insert(activityLogs)
         .values({
           orgId: ctx.orgId!,
@@ -156,12 +156,18 @@ export const activityRouter = router({
         })
         .returning();
 
-      await auditService.logCreate(ctx, "activityLog", created.id, {
-        type: input.type,
-        description: input.description,
-        entityType: input.entityType,
-        entityId: input.entityId,
-      });
+      await auditService.logCreate(
+        ctx.orgId!,
+        ctx.user.id,
+        'activityLog',
+        created.id,
+        {
+          type: input.type,
+          description: input.description,
+          entityType: input.entityType,
+          entityId: input.entityId,
+        }
+      );
 
       return created;
     }),
@@ -181,7 +187,7 @@ export const activityRouter = router({
 
       const whereClause = conditions.length > 1 ? and(...conditions) : conditions[0];
 
-      const items = await ctx.db
+      const items = await db
         .select()
         .from(activityLogs)
         .where(whereClause)

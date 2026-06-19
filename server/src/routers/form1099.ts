@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { router, protectedProcedure } from '../trpc.js';
+import { router, protectedProcedure, adminProcedure } from '../trpc.js';
 import { db } from '../db/index.js';
 import { form1099s, contacts, taxYears, payments } from '../db/schema.js';
 import { eq, and, or, ilike, desc, count, gte, lte, sql, sum } from 'drizzle-orm';
@@ -106,7 +106,7 @@ export const form1099Router = router({
     }),
 
   // ── 3. generate1099 ─────────────────────
-  generate1099: protectedProcedure
+  generate1099: adminProcedure
     .input(
       z.object({
         contactId: z.string().uuid(),
@@ -143,7 +143,8 @@ export const form1099Router = router({
         where: and(
           eq(form1099s.contactId, input.contactId),
           eq(form1099s.taxYearId, input.taxYearId),
-          eq(form1099s.formType, input.formType as any)
+          eq(form1099s.formType, input.formType as any),
+          eq(form1099s.orgId, ctx.orgId!)
         ),
       });
       if (existing) {
@@ -227,7 +228,7 @@ export const form1099Router = router({
     }),
 
   // ── 4. update1099 ─────────────────────────
-  update1099: protectedProcedure
+  update1099: adminProcedure
     .input(
       z.object({
         id: z.string().uuid(),
@@ -312,7 +313,7 @@ export const form1099Router = router({
     }),
 
   // ── 5. distribute1099 ─────────────────────
-  distribute1099: protectedProcedure
+  distribute1099: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
       const existing = await db.query.form1099s.findFirst({
@@ -345,7 +346,7 @@ export const form1099Router = router({
     }),
 
   // ── 6. file1099 ───────────────────────────
-  file1099: protectedProcedure
+  file1099: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
       const existing = await db.query.form1099s.findFirst({
@@ -384,7 +385,7 @@ export const form1099Router = router({
     }),
 
   // ── 7. correct1099 ──────────────────────
-  correct1099: protectedProcedure
+  correct1099: adminProcedure
     .input(
       z.object({
         id: z.string().uuid(),
@@ -499,7 +500,7 @@ export const form1099Router = router({
     }),
 
   // ── 8. delete1099 ─────────────────────────
-  delete1099: protectedProcedure
+  delete1099: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
       const existing = await db.query.form1099s.findFirst({

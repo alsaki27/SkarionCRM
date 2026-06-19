@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { eq, and, or, ilike, desc, count, gte, lte, sql, sum } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { router, protectedProcedure } from '../trpc.js';
+import { router, protectedProcedure, adminProcedure } from '../trpc.js';
 import { db } from '../db/index.js';
 import { expenseReports, expenseItems, employees, users } from '../db/schema.js';
 import { auditService } from '../services/audit.js';
@@ -243,6 +243,22 @@ export const expenseRouter = router({
         });
       }
 
+      // If user is not admin, restrict to their own employeeId
+      if (ctx.user.role !== 'admin') {
+        const currentUserEmployee = await db.query.employees.findFirst({
+          where: and(
+            eq(employees.userId, ctx.user.id),
+            eq(employees.orgId, ctx.orgId!)
+          ),
+        });
+        if (!currentUserEmployee || currentUserEmployee.id !== input.employeeId) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You can only create expense reports for yourself',
+          });
+        }
+      }
+
       // Calculate total amount from items
       const totalAmount = input.items
         .reduce((acc, item) => acc + Number(item.amount), 0)
@@ -294,12 +310,13 @@ export const expenseRouter = router({
 
       await db.insert(expenseItems).values(itemValues);
 
-      await auditService.logCreate({
-        ctx,
-        entityType: 'expenseReport',
-        entityId: report.id,
-        data: { reportName: report.reportName, totalAmount, status: 'draft' },
-      });
+      await auditService.logCreate(
+        ctx.orgId!,
+        ctx.user.id,
+        'expenseReport',
+        report.id,
+        { reportName: report.reportName, totalAmount, status: 'draft' }
+      );
 
       return report;
     }),
@@ -413,12 +430,14 @@ export const expenseRouter = router({
         )
         .returning();
 
-      await auditService.logUpdate({
-        ctx,
-        entityType: 'expenseReport',
-        entityId: id,
-        data: updateValues,
-      });
+      await auditService.logUpdate(
+        ctx.orgId!,
+        ctx.user.id,
+        'expenseReport',
+        id,
+        existing as Record<string, unknown>,
+        updateValues
+      );
 
       return updated;
     }),
@@ -463,18 +482,20 @@ export const expenseRouter = router({
         )
         .returning();
 
-      await auditService.logUpdate({
-        ctx,
-        entityType: 'expenseReport',
-        entityId: input.id,
-        data: { status: 'submitted', submittedAt: updated.submittedAt },
-      });
+      await auditService.logUpdate(
+        ctx.orgId!,
+        ctx.user.id,
+        'expenseReport',
+        input.id,
+        report as Record<string, unknown>,
+        { status: 'submitted', submittedAt: updated.submittedAt }
+      );
 
       return updated;
     }),
 
   // ── 6. reviewExpenseReport ──────────────────
-  reviewExpenseReport: protectedProcedure
+  reviewExpenseReport: adminProcedure
     .input(reviewInput)
     .mutation(async ({ ctx, input }) => {
       const report = await db.query.expenseReports.findFirst({
@@ -522,18 +543,20 @@ export const expenseRouter = router({
         )
         .returning();
 
-      await auditService.logUpdate({
-        ctx,
-        entityType: 'expenseReport',
-        entityId: input.id,
-        data: { status: newStatus, reviewedBy: ctx.user.id, notes: input.notes },
-      });
+      await auditService.logUpdate(
+        ctx.orgId!,
+        ctx.user.id,
+        'expenseReport',
+        input.id,
+        report as Record<string, unknown>,
+        { status: newStatus, reviewedBy: ctx.user.id, notes: input.notes }
+      );
 
       return updated;
     }),
 
   // ── 7. approveExpenseReport ─────────────────
-  approveExpenseReport: protectedProcedure
+  approveExpenseReport: adminProcedure
     .input(approveInput)
     .mutation(async ({ ctx, input }) => {
       const report = await db.query.expenseReports.findFirst({
@@ -580,18 +603,20 @@ export const expenseRouter = router({
         )
         .returning();
 
-      await auditService.logUpdate({
-        ctx,
-        entityType: 'expenseReport',
-        entityId: input.id,
-        data: { status: 'approved', approvedBy: ctx.user.id, notes: input.notes },
-      });
+      await auditService.logUpdate(
+        ctx.orgId!,
+        ctx.user.id,
+        'expenseReport',
+        input.id,
+        report as Record<string, unknown>,
+        { status: 'approved', approvedBy: ctx.user.id, notes: input.notes }
+      );
 
       return updated;
     }),
 
   // ── 8. rejectExpenseReport ──────────────────
-  rejectExpenseReport: protectedProcedure
+  rejectExpenseReport: adminProcedure
     .input(rejectInput)
     .mutation(async ({ ctx, input }) => {
       const report = await db.query.expenseReports.findFirst({
@@ -635,18 +660,20 @@ export const expenseRouter = router({
         )
         .returning();
 
-      await auditService.logUpdate({
-        ctx,
-        entityType: 'expenseReport',
-        entityId: input.id,
-        data: { status: 'rejected', approvedBy: ctx.user.id, reason: input.reason },
-      });
+      await auditService.logUpdate(
+        ctx.orgId!,
+        ctx.user.id,
+        'expenseReport',
+        input.id,
+        report as Record<string, unknown>,
+        { status: 'rejected', approvedBy: ctx.user.id, reason: input.reason }
+      );
 
       return updated;
     }),
 
   // ── 9. reimburseExpenseReport ───────────────
-  reimburseExpenseReport: protectedProcedure
+  reimburseExpenseReport: adminProcedure
     .input(reimburseInput)
     .mutation(async ({ ctx, input }) => {
       const report = await db.query.expenseReports.findFirst({
@@ -696,12 +723,14 @@ export const expenseRouter = router({
         )
         .returning();
 
-      await auditService.logUpdate({
-        ctx,
-        entityType: 'expenseReport',
-        entityId: input.id,
-        data: { status: 'reimbursed', reimbursedAmount, isPartial },
-      });
+      await auditService.logUpdate(
+        ctx.orgId!,
+        ctx.user.id,
+        'expenseReport',
+        input.id,
+        report as Record<string, unknown>,
+        { status: 'reimbursed', reimbursedAmount, isPartial }
+      );
 
       return updated;
     }),
@@ -751,12 +780,13 @@ export const expenseRouter = router({
           )
         );
 
-      await auditService.logDelete({
-        ctx,
-        entityType: 'expenseReport',
-        entityId: input.id,
-        data: { reportName: report.reportName, totalAmount: report.totalAmount },
-      });
+      await auditService.logDelete(
+        ctx.orgId!,
+        ctx.user.id,
+        'expenseReport',
+        input.id,
+        report as Record<string, unknown>
+      );
 
       return { success: true, id: input.id };
     }),
@@ -828,12 +858,13 @@ export const expenseRouter = router({
           )
         );
 
-      await auditService.logCreate({
-        ctx,
-        entityType: 'expenseItem',
-        entityId: item.id,
-        data: { expenseReportId: input.expenseReportId, amount: amountStr, category: input.category },
-      });
+      await auditService.logCreate(
+        ctx.orgId!,
+        ctx.user.id,
+        'expenseItem',
+        item.id,
+        { expenseReportId: input.expenseReportId, amount: amountStr, category: input.category }
+      );
 
       return item;
     }),
@@ -871,12 +902,14 @@ export const expenseRouter = router({
         )
         .returning();
 
-      await auditService.logUpdate({
-        ctx,
-        entityType: 'expenseItem',
-        entityId: input.id,
-        data: { approved: input.approve, approvedBy: input.approve ? ctx.user.id : null },
-      });
+      await auditService.logUpdate(
+        ctx.orgId!,
+        ctx.user.id,
+        'expenseItem',
+        input.id,
+        item as Record<string, unknown>,
+        { approved: input.approve, approvedBy: input.approve ? ctx.user.id : null }
+      );
 
       return updated;
     }),

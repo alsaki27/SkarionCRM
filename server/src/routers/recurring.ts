@@ -1,4 +1,4 @@
-import { router, protectedProcedure } from '../trpc.js';
+import { router, protectedProcedure, adminProcedure } from '../trpc.js';
 import { db } from '../db/index.js';
 import { recurringTransactions, chartOfAccounts, contacts, transactions } from '../db/schema.js';
 import { eq, and, or, ilike, desc, count, gte, lte, sql } from 'drizzle-orm';
@@ -170,7 +170,7 @@ export const recurringRouter = router({
     }),
 
   // ── 3. createRecurring ────────────────────────────────────────────────────
-  createRecurring: protectedProcedure
+  createRecurring: adminProcedure
     .input(
       z.object({
         name: z.string().min(1).max(255),
@@ -266,7 +266,8 @@ export const recurringRouter = router({
         .returning();
 
       await auditService.logCreate(
-        ctx,
+        ctx.orgId!,
+        ctx.user.id,
         'recurringTransaction',
         created.id,
         insertData
@@ -276,7 +277,7 @@ export const recurringRouter = router({
     }),
 
   // ── 4. updateRecurring ────────────────────────────────────────────────────
-  updateRecurring: protectedProcedure
+  updateRecurring: adminProcedure
     .input(
       z.object({
         id: z.string(),
@@ -402,9 +403,11 @@ export const recurringRouter = router({
         .returning();
 
       await auditService.logUpdate(
-        ctx,
+        ctx.orgId!,
+        ctx.user.id,
         'recurringTransaction',
         input.id,
+        existing as Record<string, unknown>,
         updateData
       );
 
@@ -412,7 +415,7 @@ export const recurringRouter = router({
     }),
 
   // ── 5. deleteRecurring ────────────────────────────────────────────────────
-  deleteRecurring: protectedProcedure
+  deleteRecurring: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const existing = await db.query.recurringTransactions.findFirst({
@@ -438,17 +441,18 @@ export const recurringRouter = router({
         );
 
       await auditService.logDelete(
-        ctx,
+        ctx.orgId!,
+        ctx.user.id,
         'recurringTransaction',
         input.id,
-        existing
+        existing as Record<string, unknown>
       );
 
       return { success: true, id: input.id };
     }),
 
   // ── 6. generateRun ────────────────────────────────────────────────────────
-  generateRun: protectedProcedure
+  generateRun: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const recurring = await db.query.recurringTransactions.findFirst({
@@ -547,7 +551,8 @@ export const recurringRouter = router({
       });
 
       await auditService.logCreate(
-        ctx,
+        ctx.orgId!,
+        ctx.user.id,
         'transaction',
         result.id,
         transactionInsert
@@ -594,7 +599,7 @@ export const recurringRouter = router({
     }),
 
   // ── 8. toggleActive ───────────────────────────────────────────────────────
-  toggleActive: protectedProcedure
+  toggleActive: adminProcedure
     .input(
       z.object({
         id: z.string(),
@@ -629,9 +634,14 @@ export const recurringRouter = router({
         )
         .returning();
 
-      await auditService.logUpdate(ctx, 'recurringTransaction', input.id, {
-        isActive: input.isActive,
-      });
+      await auditService.logUpdate(
+        ctx.orgId!,
+        ctx.user.id,
+        'recurringTransaction',
+        input.id,
+        existing as Record<string, unknown>,
+        { isActive: input.isActive }
+      );
 
       return updated;
     }),

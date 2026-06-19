@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { router, protectedProcedure } from '../trpc.js';
+import { router, protectedProcedure, adminProcedure } from '../trpc.js';
 import { db } from '../db/index.js';
 import { taxYears, taxForms, taxCalculations, contacts } from '../db/schema.js';
 import { eq, and, or, ilike, desc, count, gte, lte, sql } from 'drizzle-orm';
@@ -52,7 +52,7 @@ export const taxRouter = router({
       return { items, total: totalResult[0]?.count ?? 0 };
     }),
 
-  createTaxYear: protectedProcedure
+  createTaxYear: adminProcedure
     .input(
       z.object({
         year: z.number().int().min(1900).max(2100),
@@ -96,7 +96,7 @@ export const taxRouter = router({
       return year;
     }),
 
-  closeTaxYear: protectedProcedure
+  closeTaxYear: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
       const existing = await db.query.taxYears.findFirst({
@@ -111,7 +111,7 @@ export const taxRouter = router({
       const [updated] = await db
         .update(taxYears)
         .set({ status: 'closed', filedDate: new Date().toISOString().split('T')[0], updatedAt: new Date() })
-        .where(eq(taxYears.id, input.id))
+        .where(and(eq(taxYears.id, input.id), eq(taxYears.orgId, ctx.orgId!)))
         .returning();
 
       await auditService.logUpdate(
@@ -185,7 +185,7 @@ export const taxRouter = router({
       return { items, total: totalResult[0]?.count ?? 0 };
     }),
 
-  createTaxForm: protectedProcedure
+  createTaxForm: adminProcedure
     .input(
       z.object({
         taxYearId: z.string().uuid(),
@@ -243,7 +243,7 @@ export const taxRouter = router({
       return form;
     }),
 
-  updateTaxForm: protectedProcedure
+  updateTaxForm: adminProcedure
     .input(
       z.object({
         id: z.string().uuid(),
@@ -277,7 +277,7 @@ export const taxRouter = router({
       const [updated] = await db
         .update(taxForms)
         .set(setData)
-        .where(eq(taxForms.id, id))
+        .where(and(eq(taxForms.id, id), eq(taxForms.orgId, ctx.orgId!)))
         .returning();
 
       await auditService.logUpdate(

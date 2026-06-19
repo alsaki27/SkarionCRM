@@ -93,7 +93,11 @@ export const documentRouter = router({
       });
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND', message: 'Document not found' });
 
-      await db.delete(documents).where(eq(documents.id, input.id));
+      if (ctx.user.role !== 'admin' && existing.uploadedBy !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'You can only delete documents you uploaded' });
+      }
+
+      await db.delete(documents).where(and(eq(documents.id, input.id), eq(documents.orgId, ctx.orgId!)));
 
       await auditService.logDelete(
         ctx.orgId!,
@@ -170,7 +174,7 @@ export const documentRouter = router({
       return { items, total: totalResult[0]?.count ?? 0 };
     }),
 
-  createTemplate: protectedProcedure
+  createTemplate: adminProcedure
     .input(z.object({
       name: z.string().min(1).max(255),
       templateType: z.enum(['w2', '1099', 'contract', 'invoice', 'letter', 'compliance', 'paystub', 'other']),

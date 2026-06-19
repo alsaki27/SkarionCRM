@@ -363,6 +363,12 @@ export const ptoRouter = router({
     .input(createLeaveRequestSchema)
     .mutation(async ({ input, ctx }) => {
       const employeeId = input.employeeId ?? await getCurrentEmployeeId(ctx);
+      if (!isAdminRole(ctx.user.role) && input.employeeId) {
+        const currentEmpId = await getCurrentEmployeeId(ctx);
+        if (input.employeeId !== currentEmpId) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'You can only create leave requests for yourself' });
+        }
+      }
       const emp = await db.query.employees.findFirst({
         where: and(eq(employees.id, employeeId), eq(employees.orgId, ctx.orgId!)),
       });
@@ -429,7 +435,7 @@ export const ptoRouter = router({
         const remaining = round2(toDecimal(balance.totalEntitled) + toDecimal(balance.accrued) + toDecimal(balance.carryOver) - used - pending);
         await db.update(leaveBalances)
           .set({ pending: String(pending), remaining: String(remaining), updatedAt: new Date() })
-          .where(eq(leaveBalances.id, balance.id));
+          .where(and(eq(leaveBalances.id, balance.id), eq(leaveBalances.orgId, ctx.orgId!)));
       }
 
       // If auto-approved, update attendance
@@ -468,11 +474,13 @@ export const ptoRouter = router({
 
       // Notify manager if applicable
       if (leaveType.requiresApproval) {
-        const mgr = await db.query.users.findFirst({
-          where: and(eq(users.id, emp.id as any), eq(users.orgId, ctx.orgId!)),
-        });
-        if (mgr) {
-          await notify(ctx.orgId!, mgr.id, 'task', 'New leave request', `${emp.firstName} ${emp.lastName} requested ${daysRequested} day(s) of ${leaveType.name}.`);
+        if (emp.managerId) {
+          const mgr = await db.query.users.findFirst({
+            where: and(eq(users.id, emp.managerId), eq(users.orgId, ctx.orgId!)),
+          });
+          if (mgr) {
+            await notify(ctx.orgId!, mgr.id, 'task', 'New leave request', `${emp.firstName} ${emp.lastName} requested ${daysRequested} day(s) of ${leaveType.name}.`);
+          }
         }
       }
 
@@ -482,7 +490,7 @@ export const ptoRouter = router({
   /* ================================================================ */
   /*  7. approveLeaveRequest                                          */
   /* ================================================================ */
-  approveLeaveRequest: protectedProcedure
+  approveLeaveRequest: adminProcedure
     .input(approveRejectSchema)
     .mutation(async ({ input, ctx }) => {
       const request = await db.query.leaveRequests.findFirst({
@@ -514,7 +522,7 @@ export const ptoRouter = router({
         const remaining = round2(toDecimal(balance.totalEntitled) + toDecimal(balance.accrued) + toDecimal(balance.carryOver) - used - pending);
         await db.update(leaveBalances)
           .set({ used: String(used), pending: String(Math.max(0, pending)), remaining: String(remaining), updatedAt: new Date() })
-          .where(eq(leaveBalances.id, balance.id));
+          .where(and(eq(leaveBalances.id, balance.id), eq(leaveBalances.orgId, ctx.orgId!)));
       }
 
       const [updated] = await db.update(leaveRequests)
@@ -574,7 +582,7 @@ export const ptoRouter = router({
   /* ================================================================ */
   /*  8. rejectLeaveRequest                                           */
   /* ================================================================ */
-  rejectLeaveRequest: protectedProcedure
+  rejectLeaveRequest: adminProcedure
     .input(rejectSchema)
     .mutation(async ({ input, ctx }) => {
       const request = await db.query.leaveRequests.findFirst({
@@ -676,7 +684,7 @@ export const ptoRouter = router({
         const remaining = round2(toDecimal(balance.totalEntitled) + toDecimal(balance.accrued) + toDecimal(balance.carryOver) - used - Math.max(0, pending));
         await db.update(leaveBalances)
           .set({ used: String(used), pending: String(Math.max(0, pending)), remaining: String(remaining), updatedAt: new Date() })
-          .where(eq(leaveBalances.id, balance.id));
+          .where(and(eq(leaveBalances.id, balance.id), eq(leaveBalances.orgId, ctx.orgId!)));
       }
 
       const [updated] = await db.update(leaveRequests)
@@ -750,27 +758,13 @@ export const ptoRouter = router({
       const now = new Date();
       const currentYear = now.getFullYear();
 
-      let balanceQuery = db.select().from(leaveBalances)
-        .where(and(eq(leaveBalances.orgId, ctx.orgId!), eq(leaveBalances.year, currentYear)));
-      if (input.employeeId) {
-        balanceQuery = db.select().from(leaveBalances)
-          .where(and(eq(leaveBalances.orgId, ctx.orgId!), eq(leaveBalances.year, currentYear), eq(leaveBalances.employeeId, input.employeeId))) as any;
-      }
-      if (input.leaveTypeId) {
-        balanceQuery = db.select().from(leaveBalances)
-          .where(and(eq(leaveBalances.orgId, ctx.orgId!), eq(leaveBalances.year, currentYear), eq(leaveBalances.leaveTypeId, input.leaveTypeId))) as any;
-      }
-      if (input.employeeId && input.leaveTypeId) {
-        balanceQuery = db.select().from(leaveBalances)
-          .where(and(
-            eq(leaveBalances.orgId, ctx.orgId!),
-            eq(leaveBalances.year, currentYear),
-            eq(leaveBalances.employeeId, input.employeeId),
-            eq(leaveBalances.leaveTypeId, input.leaveTypeId),
-          )) as any;
-      }
-
-      const balances = await balanceQuery;
+      const conditions = [
+        eq(leaveBalances.orgId, ctx.orgId!),
+        eq(leaveBalances.year, currentYear),
+      ];
+      if (input.employeeId) conditions.push(eq(leaveBalances.employeeId, input.employeeId));
+      if (input.leaveTypeId) conditions.push(eq(leaveBalances.leaveTypeId, input.leaveTypeId));
+      const balances = await db.select().from(leaveBalances).where(and(...conditions));
       const updatedIds: string[] = [];
 
       for (const balance of balances) {

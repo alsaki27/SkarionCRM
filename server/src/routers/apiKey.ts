@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { eq, and, or, desc, count, gte, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { router, protectedProcedure, publicProcedure } from '../trpc.js';
+import { router, protectedProcedure, publicProcedure, adminProcedure } from '../trpc.js';
 import { db } from '../db/index.js';
 import { apiKeys, users } from '../db/schema.js';
 import { auditService } from '../services/audit.js';
@@ -78,7 +78,7 @@ export const apiKeyRouter = router({
         orderBy: [desc(apiKeys.createdAt)],
       });
 
-      return { total, keys };
+      return { total, keys: keys.map(({ keyHash: _kh, ...k }) => k) };
     }),
 
   // ── 2. getApiKeyById ──────────────────────
@@ -104,11 +104,12 @@ export const apiKeyRouter = router({
         });
       }
 
-      return key;
+      const { keyHash: _kh, ...keyWithoutHash } = key;
+      return keyWithoutHash;
     }),
 
   // ── 3. createApiKey ───────────────────────
-  createApiKey: protectedProcedure
+  createApiKey: adminProcedure
     .input(createApiKeyInput)
     .mutation(async ({ ctx, input }) => {
       const keyPrefix = 'skarion_';
@@ -146,7 +147,7 @@ export const apiKeyRouter = router({
     }),
 
   // ── 4. revokeApiKey ───────────────────────
-  revokeApiKey: protectedProcedure
+  revokeApiKey: adminProcedure
     .input(revokeApiKeyInput)
     .mutation(async ({ ctx, input }) => {
       const existing = await db.query.apiKeys.findFirst({
@@ -197,7 +198,7 @@ export const apiKeyRouter = router({
     }),
 
   // ── 5. deleteApiKey ───────────────────────
-  deleteApiKey: protectedProcedure
+  deleteApiKey: adminProcedure
     .input(deleteApiKeyInput)
     .mutation(async ({ ctx, input }) => {
       const existing = await db.query.apiKeys.findFirst({

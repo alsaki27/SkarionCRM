@@ -134,7 +134,7 @@ export const financialRouter = router({
       const [updated] = await db
         .update(chartOfAccounts)
         .set({ ...updates, updatedAt: new Date() })
-        .where(eq(chartOfAccounts.id, id))
+        .where(and(eq(chartOfAccounts.id, id), eq(chartOfAccounts.orgId, ctx.orgId!)))
         .returning();
 
       await auditService.logUpdate(
@@ -160,7 +160,7 @@ export const financialRouter = router({
       const [updated] = await db
         .update(chartOfAccounts)
         .set({ isActive: false, updatedAt: new Date() })
-        .where(eq(chartOfAccounts.id, input.id))
+        .where(and(eq(chartOfAccounts.id, input.id), eq(chartOfAccounts.orgId, ctx.orgId!)))
         .returning();
 
       await auditService.logDelete(
@@ -327,7 +327,7 @@ export const financialRouter = router({
       const [updated] = await db
         .update(transactions)
         .set(setData)
-        .where(eq(transactions.id, id))
+        .where(and(eq(transactions.id, id), eq(transactions.orgId, ctx.orgId!)))
         .returning();
 
       await auditService.logUpdate(
@@ -354,7 +354,7 @@ export const financialRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Cannot delete a reconciled transaction' });
       }
 
-      await db.delete(transactions).where(eq(transactions.id, input.id));
+      await db.delete(transactions).where(and(eq(transactions.id, input.id), eq(transactions.orgId, ctx.orgId!)));
 
       await auditService.logDelete(
         ctx.orgId!,
@@ -663,7 +663,7 @@ export const financialRouter = router({
       const [updated] = await db
         .update(bankAccounts)
         .set(setData)
-        .where(eq(bankAccounts.id, id))
+        .where(and(eq(bankAccounts.id, id), eq(bankAccounts.orgId, ctx.orgId!)))
         .returning();
 
       await auditService.logUpdate(
@@ -698,7 +698,7 @@ export const financialRouter = router({
           reconciledBy: ctx.user.id,
           updatedAt: new Date(),
         })
-        .where(eq(transactions.id, input.id))
+        .where(and(eq(transactions.id, input.id), eq(transactions.orgId, ctx.orgId!)))
         .returning();
 
       await auditService.logUpdate(

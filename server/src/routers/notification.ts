@@ -1,9 +1,10 @@
-import { z } from "zod";
-import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure } from "../trpc.js";
-import { eq, and, desc, count } from "drizzle-orm";
-import { notifications } from "../db/schema.js";
-import { auditService } from "../services/auditService.js";
+import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
+import { router, protectedProcedure } from '../trpc.js';
+import { eq, and, desc, count, isNull, isNotNull } from 'drizzle-orm';
+import { notifications } from '../db/schema.js';
+import { auditService } from '../services/audit.js';
+import { db } from '../db/index.js';
 
 export const notificationRouter = router({
   listNotifications: protectedProcedure
@@ -18,13 +19,16 @@ export const notificationRouter = router({
     .query(async ({ ctx, input }) => {
       const offset = (input.page - 1) * input.pageSize;
 
-      const conditions = [eq(notifications.orgId, ctx.orgId!)];
+      const conditions = [
+        eq(notifications.orgId, ctx.orgId!),
+        eq(notifications.userId, ctx.user.id),
+      ];
 
       if (input.read !== undefined) {
         conditions.push(
           input.read
-            ? eq(notifications.readAt, new Date())
-            : eq(notifications.readAt, null)
+            ? isNotNull(notifications.readAt)
+            : isNull(notifications.readAt)
         );
       }
 
@@ -35,14 +39,14 @@ export const notificationRouter = router({
       const whereClause = conditions.length > 1 ? and(...conditions) : conditions[0];
 
       const [items, totalResult] = await Promise.all([
-        ctx.db
+        db
           .select()
           .from(notifications)
           .where(whereClause)
           .orderBy(desc(notifications.createdAt))
           .limit(input.pageSize)
           .offset(offset),
-        ctx.db
+        db
           .select({ value: count() })
           .from(notifications)
           .where(whereClause),
@@ -62,13 +66,14 @@ export const notificationRouter = router({
     }),
 
   getUnreadCount: protectedProcedure.query(async ({ ctx }) => {
-    const result = await ctx.db
+    const result = await db
       .select({ value: count() })
       .from(notifications)
       .where(
         and(
           eq(notifications.orgId, ctx.orgId!),
-          eq(notifications.readAt, null)
+          eq(notifications.userId, ctx.user.id),
+          isNull(notifications.readAt)
         )
       );
 
@@ -78,38 +83,45 @@ export const notificationRouter = router({
   markAsRead: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const existing = await ctx.db
+      const existing = await db
         .select()
         .from(notifications)
         .where(
           and(
             eq(notifications.id, input.id),
-            eq(notifications.orgId, ctx.orgId!)
+            eq(notifications.orgId, ctx.orgId!),
+            eq(notifications.userId, ctx.user.id)
           )
         )
         .limit(1);
 
       if (!existing.length) {
         throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Notification not found",
+          code: 'NOT_FOUND',
+          message: 'Notification not found',
         });
       }
 
-      const [updated] = await ctx.db
+      const [updated] = await db
         .update(notifications)
         .set({ readAt: new Date(), updatedAt: new Date() })
         .where(
           and(
             eq(notifications.id, input.id),
-            eq(notifications.orgId, ctx.orgId!)
+            eq(notifications.orgId, ctx.orgId!),
+            eq(notifications.userId, ctx.user.id)
           )
         )
         .returning();
 
-      await auditService.logUpdate(ctx, "notification", input.id, {
-        readAt: new Date().toISOString(),
-      });
+      await auditService.logUpdate(
+        ctx.orgId!,
+        ctx.user.id,
+        'notification',
+        input.id,
+        {},
+        { readAt: new Date().toISOString() }
+      );
 
       return updated;
     }),
@@ -117,20 +129,25 @@ export const notificationRouter = router({
   markAllAsRead: protectedProcedure.mutation(async ({ ctx }) => {
     const now = new Date();
 
-    await ctx.db
+    await db
       .update(notifications)
       .set({ readAt: now, updatedAt: now })
       .where(
         and(
           eq(notifications.orgId, ctx.orgId!),
-          eq(notifications.readAt, null)
+          eq(notifications.userId, ctx.user.id),
+          isNull(notifications.readAt)
         )
       );
 
-    await auditService.logUpdate(ctx, "notification", "all", {
-      action: "markAllAsRead",
-      readAt: now.toISOString(),
-    });
+    await auditService.logUpdate(
+      ctx.orgId!,
+      ctx.user.id,
+      'notification',
+      'all',
+      {},
+      { action: 'markAllAsRead', readAt: now.toISOString() }
+    );
 
     return { success: true };
   }),
@@ -138,38 +155,45 @@ export const notificationRouter = router({
   dismissNotification: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const existing = await ctx.db
+      const existing = await db
         .select()
         .from(notifications)
         .where(
           and(
             eq(notifications.id, input.id),
-            eq(notifications.orgId, ctx.orgId!)
+            eq(notifications.orgId, ctx.orgId!),
+            eq(notifications.userId, ctx.user.id)
           )
         )
         .limit(1);
 
       if (!existing.length) {
         throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Notification not found",
+          code: 'NOT_FOUND',
+          message: 'Notification not found',
         });
       }
 
-      const [updated] = await ctx.db
+      const [updated] = await db
         .update(notifications)
         .set({ dismissedAt: new Date(), updatedAt: new Date() })
         .where(
           and(
             eq(notifications.id, input.id),
-            eq(notifications.orgId, ctx.orgId!)
+            eq(notifications.orgId, ctx.orgId!),
+            eq(notifications.userId, ctx.user.id)
           )
         )
         .returning();
 
-      await auditService.logUpdate(ctx, "notification", input.id, {
-        dismissedAt: new Date().toISOString(),
-      });
+      await auditService.logUpdate(
+        ctx.orgId!,
+        ctx.user.id,
+        'notification',
+        input.id,
+        {},
+        { dismissedAt: new Date().toISOString() }
+      );
 
       return updated;
     }),
@@ -187,7 +211,7 @@ export const notificationRouter = router({
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
 
-      const [created] = await ctx.db
+      const [created] = await db
         .insert(notifications)
         .values({
           orgId: ctx.orgId!,
@@ -203,11 +227,17 @@ export const notificationRouter = router({
         })
         .returning();
 
-      await auditService.logCreate(ctx, "notification", created.id, {
-        userId: input.userId,
-        type: input.type,
-        title: input.title,
-      });
+      await auditService.logCreate(
+        ctx.orgId!,
+        ctx.user.id,
+        'notification',
+        created.id,
+        {
+          userId: input.userId,
+          type: input.type,
+          title: input.title,
+        }
+      );
 
       return created;
     }),
@@ -215,36 +245,42 @@ export const notificationRouter = router({
   deleteNotification: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const existing = await ctx.db
+      const existing = await db
         .select()
         .from(notifications)
         .where(
           and(
             eq(notifications.id, input.id),
-            eq(notifications.orgId, ctx.orgId!)
+            eq(notifications.orgId, ctx.orgId!),
+            eq(notifications.userId, ctx.user.id)
           )
         )
         .limit(1);
 
       if (!existing.length) {
         throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Notification not found",
+          code: 'NOT_FOUND',
+          message: 'Notification not found',
         });
       }
 
-      await ctx.db
+      await db
         .delete(notifications)
         .where(
           and(
             eq(notifications.id, input.id),
-            eq(notifications.orgId, ctx.orgId!)
+            eq(notifications.orgId, ctx.orgId!),
+            eq(notifications.userId, ctx.user.id)
           )
         );
 
-      await auditService.logDelete(ctx, "notification", input.id, {
-        title: existing[0]?.title,
-      });
+      await auditService.logDelete(
+        ctx.orgId!,
+        ctx.user.id,
+        'notification',
+        input.id,
+        { title: existing[0]?.title }
+      );
 
       return { success: true, id: input.id };
     }),

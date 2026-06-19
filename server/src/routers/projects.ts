@@ -317,7 +317,7 @@ export const projectsRouter = router({
       const [updated] = await db
         .update(projects)
         .set(updateData)
-        .where(eq(projects.id, id))
+        .where(and(eq(projects.id, id), eq(projects.orgId, ctx.orgId!)))
         .returning();
 
       await auditService.logUpdate(
@@ -346,7 +346,7 @@ export const projectsRouter = router({
       await db
         .update(projects)
         .set({ status: 'cancelled', updatedAt: new Date() })
-        .where(eq(projects.id, input.id));
+        .where(and(eq(projects.id, input.id), eq(projects.orgId, ctx.orgId!)));
 
       await auditService.logDelete(
         ctx.orgId!,
@@ -475,7 +475,7 @@ export const projectsRouter = router({
       const [updated] = await db
         .update(projectTasks)
         .set(updateData)
-        .where(eq(projectTasks.id, id))
+        .where(and(eq(projectTasks.id, id), eq(projectTasks.orgId, ctx.orgId!)))
         .returning();
 
       await auditService.logUpdate(
@@ -501,7 +501,7 @@ export const projectsRouter = router({
       });
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND', message: 'Task not found' });
 
-      await db.delete(projectTasks).where(eq(projectTasks.id, input.id));
+      await db.delete(projectTasks).where(and(eq(projectTasks.id, input.id), eq(projectTasks.orgId, ctx.orgId!)));
 
       await auditService.logDelete(
         ctx.orgId!,
@@ -525,6 +525,10 @@ export const projectsRouter = router({
         eq(projectTimeEntries.projectId, input.projectId),
       ];
       if (input.employeeId) conditions.push(eq(projectTimeEntries.employeeId, input.employeeId));
+      if (ctx.user.role !== 'admin') {
+        const employeeId = await getEmployeeIdFromCtx(ctx);
+        conditions.push(eq(projectTimeEntries.employeeId, employeeId));
+      }
       if (input.dateFrom) conditions.push(gte(projectTimeEntries.date, input.dateFrom));
       if (input.dateTo) conditions.push(lte(projectTimeEntries.date, input.dateTo));
 

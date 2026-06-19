@@ -64,7 +64,7 @@ export const w2Router = router({
       return { items, total: totalResult[0]?.count ?? 0 };
     }),
 
-  generateW2: protectedProcedure
+  generateW2: adminProcedure
     .input(z.object({
       employeeId: z.string().uuid(),
       taxYearId: z.string().uuid(),
@@ -83,7 +83,7 @@ export const w2Router = router({
 
       // Check if W2 already exists
       const existing = await db.query.w2Forms.findFirst({
-        where: and(eq(w2Forms.employeeId, input.employeeId), eq(w2Forms.taxYearId, input.taxYearId)),
+        where: and(eq(w2Forms.employeeId, input.employeeId), eq(w2Forms.taxYearId, input.taxYearId), eq(w2Forms.orgId, ctx.orgId!)),
       });
       if (existing) throw new TRPCError({ code: 'CONFLICT', message: 'W2 already exists for this employee and tax year' });
 
@@ -186,7 +186,7 @@ export const w2Router = router({
       return w2;
     }),
 
-  updateW2: protectedProcedure
+  updateW2: adminProcedure
     .input(z.object({
       id: z.string().uuid(),
       box1Wages: z.string().or(z.number()).optional(),
@@ -238,7 +238,7 @@ export const w2Router = router({
 
       const [updated] = await db.update(w2Forms)
         .set(updates)
-        .where(eq(w2Forms.id, id))
+        .where(and(eq(w2Forms.id, id), eq(w2Forms.orgId, ctx.orgId!)))
         .returning();
 
       await auditService.logUpdate(
@@ -271,7 +271,7 @@ export const w2Router = router({
 
       if (!w2) throw new TRPCError({ code: 'NOT_FOUND', message: 'W2 form not found' });
 
-      return {
+      const result = {
         ...w2,
         preview: true,
         boxes: {
@@ -298,9 +298,17 @@ export const w2Router = router({
           local: w2.localWages,
         },
       };
+
+      if (ctx.user.role !== 'admin' && result.employee) {
+        const { ssnHash, ...employeeWithoutSsn } = result.employee;
+        result.employee = employeeWithoutSsn as typeof result.employee;
+        result.boxes.a = 'XXX-XX-XXXX';
+      }
+
+      return result;
     }),
 
-  distributeW2: protectedProcedure
+  distributeW2: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
       const existing = await db.query.w2Forms.findFirst({
@@ -311,7 +319,7 @@ export const w2Router = router({
 
       const [updated] = await db.update(w2Forms)
         .set({ formStatus: 'distributed', employeeCopyDistributedAt: new Date(), updatedAt: new Date() })
-        .where(eq(w2Forms.id, input.id))
+        .where(and(eq(w2Forms.id, input.id), eq(w2Forms.orgId, ctx.orgId!)))
         .returning();
 
       await auditService.logUpdate(
@@ -326,7 +334,7 @@ export const w2Router = router({
       return updated;
     }),
 
-  fileW2: protectedProcedure
+  fileW2: adminProcedure
     .input(z.object({
       id: z.string().uuid(),
       filingType: z.enum(['irs', 'ssa']).optional(),
@@ -343,7 +351,7 @@ export const w2Router = router({
 
       const [updated] = await db.update(w2Forms)
         .set(updates)
-        .where(eq(w2Forms.id, input.id))
+        .where(and(eq(w2Forms.id, input.id), eq(w2Forms.orgId, ctx.orgId!)))
         .returning();
 
       await auditService.logUpdate(
@@ -358,7 +366,7 @@ export const w2Router = router({
       return updated;
     }),
 
-  generateW2c: protectedProcedure
+  generateW2c: adminProcedure
     .input(z.object({
       originalW2Id: z.string().uuid(),
       corrections: z.record(z.any()),
