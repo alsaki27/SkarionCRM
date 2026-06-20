@@ -8,6 +8,13 @@
       "when": 1781937554795,
       "tag": "0000_broken_killraven",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781938519061,
+      "tag": "0001_outstanding_nova",
+      "breakpoints": true
     }
   ]
 }

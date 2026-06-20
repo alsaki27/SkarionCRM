@@ -12,7 +12,7 @@ importers:
         version: 9.39.4
       '@types/node':
         specifier: ^22.10.0
-        version: 22.19.21
+        version: 22.20.0
       drizzle-kit:
         specifier: ^0.30.1
         version: 0.30.6
@@ -62,21 +62,24 @@ importers:
   apps/identity:
     dependencies:
       '@neondatabase/serverless':
-        specifier: ^1.1.0
+        specifier: 1.1.0
         version: 1.1.0
       '@skarion/db-kit':
         specifier: workspace:*
         version: link:../../packages/db-kit
       drizzle-orm:
-        specifier: ^0.45.2
-        version: 0.45.2(@neondatabase/serverless@1.1.0)(gel@2.2.0)
+        specifier: 0.45.2
+        version: 0.45.2(@neondatabase/serverless@1.1.0)(gel@2.2.0)(kysely@0.29.2)
+      hash-wasm:
+        specifier: ^4.12.0
+        version: 4.12.0
       hono:
         specifier: ^4.12.26
         version: 4.12.26
+      kysely:
+        specifier: 0.29.2
+        version: 0.29.2
     devDependencies:
-      drizzle-kit:
-        specifier: ^0.30.1
-        version: 0.30.6
       tsx:
         specifier: ^4.22.4
         version: 4.22.4
@@ -123,15 +126,15 @@ importers:
   packages/db-kit:
     dependencies:
       '@neondatabase/serverless':
-        specifier: ^1.1.0
+        specifier: 1.1.0
         version: 1.1.0
       drizzle-orm:
-        specifier: ^0.45.2
-        version: 0.45.2(@neondatabase/serverless@1.1.0)(gel@2.2.0)
+        specifier: 0.45.2
+        version: 0.45.2(@neondatabase/serverless@1.1.0)(gel@2.2.0)(kysely@0.29.2)
+      kysely:
+        specifier: 0.29.2
+        version: 0.29.2
     devDependencies:
-      drizzle-kit:
-        specifier: ^0.30.1
-        version: 0.30.6
       tsx:
         specifier: ^4.22.4
         version: 4.22.4
@@ -1475,10 +1478,10 @@ packages:
         integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==,
       }
 
-  '@types/node@22.19.21':
+  '@types/node@22.20.0':
     resolution:
       {
-        integrity: sha512-VMeFBSCKQKmm2swI2kW51SFusDqekC6q9trBCvJ/JliDchFSuoYYKN7yVNjPthP1HKZcx3U1gI/wTcEBjEFKTA==,
+        integrity: sha512-QWlFW2wf3nTjC13/DqRnBpR4ZO36VJH/JVBkA/vcnmbTBNQIlnObqyqZE1tUR7+Ni23Lda8R1BxMfbXRpCUx5g==,
       }
 
   '@typescript-eslint/eslint-plugin@8.61.1':
@@ -2233,6 +2236,12 @@ packages:
       }
     engines: { node: '>=8' }
 
+  hash-wasm@4.12.0:
+    resolution:
+      {
+        integrity: sha512-+/2B2rYLb48I/evdOIhP+K/DD2ca2fgBjp6O+GBEnCDk2e4rpeXIK8GvIyRPjTezgmWn9gmKwkQjjx6BtqDHVQ==,
+      }
+
   hono@4.12.26:
     resolution:
       {
@@ -2374,6 +2383,13 @@ packages:
       {
         integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==,
       }
+
+  kysely@0.29.2:
+    resolution:
+      {
+        integrity: sha512-s6WVJyEZrbm6jhBpiKHsGHyePMrVQKJ85wZCFCr9W4QHv6WTjWIrdvTmO9hDEA3bNK0xkrE2DqrHsXMLWuZpQg==,
+      }
+    engines: { node: '>=22.0.0' }
 
   levn@0.4.1:
     resolution:
@@ -3529,7 +3545,7 @@ snapshots:
 
   '@types/json-schema@7.0.15': {}
 
-  '@types/node@22.19.21':
+  '@types/node@22.20.0':
     dependencies:
       undici-types: 6.21.0
 
@@ -3753,10 +3769,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(gel@2.2.0):
+  drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(gel@2.2.0)(kysely@0.29.2):
     optionalDependencies:
       '@neondatabase/serverless': 1.1.0
       gel: 2.2.0
+      kysely: 0.29.2
 
   emoji-regex@10.6.0: {}
 
@@ -4033,6 +4050,8 @@ snapshots:
 
   has-flag@4.0.0: {}
 
+  hash-wasm@4.12.0: {}
+
   hono@4.12.26: {}
 
   human-signals@5.0.0: {}
@@ -4086,6 +4105,8 @@ snapshots:
   keyv@4.5.4:
     dependencies:
       json-buffer: 3.0.1
+
+  kysely@0.29.2: {}
 
   levn@0.4.1:
     dependencies:

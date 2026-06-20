@@ -2,3 +2,12 @@ packages:
   - 'apps/*'
   - 'apps/workers/*'
   - 'packages/*'
+
+# Force a single resolved instance of these across the workspace. Without
+# this, each package's own `pnpm add` can resolve to a structurally-identical
+# but nominally-different instance (different optional-peer hash in the
+# pnpm store), which breaks TypeScript's structural checks on Drizzle's
+# branded/protected class members (PgColumn etc.) across package boundaries.
+overrides:
+  drizzle-orm: 0.45.2
+  '@neondatabase/serverless': 1.1.0

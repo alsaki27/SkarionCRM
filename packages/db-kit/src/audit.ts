@@ -5,8 +5,6 @@
 // table (per the spec), so this helper takes the table as a parameter rather
 // than importing a single hardcoded schema — keeps db-kit schema-agnostic.
 
-import type { Db } from './client.js';
-
 export interface AuditEntry {
   actorUserId: string | null;
   action: string;
@@ -35,13 +33,20 @@ export interface AuditLogTable {
   userAgent?: unknown;
 }
 
-export async function withAudit<TSchema extends Record<string, unknown>>(
-  db: Db<TSchema>,
-  auditTable: AuditLogTable & { [key: string]: unknown },
+// Drizzle's real `db.insert` is itself generic (`insert<TTable extends PgTable>(table: TTable)`),
+// which a non-generic method signature can't structurally match exactly - `table: any` here
+// keeps this loose on purpose. Callers still get full type safety on `entry` (AuditEntry) and
+// on `auditTable` (whatever real Drizzle table type they pass in).
+export interface InsertableDb {
+  insert(table: any): { values(v: Record<string, unknown>): Promise<unknown> }; // eslint-disable-line @typescript-eslint/no-explicit-any
+}
+
+export async function withAudit<TTable extends AuditLogTable>(
+  db: InsertableDb,
+  auditTable: TTable,
   entry: AuditEntry
 ): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- table identity varies per schema; values below are validated by entry's own typed shape.
-  await (db as any).insert(auditTable).values({
+  await db.insert(auditTable).values({
     actorUserId: entry.actorUserId,
     action: entry.action,
     resourceType: entry.resourceType,

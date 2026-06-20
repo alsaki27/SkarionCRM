@@ -14,14 +14,15 @@
     "db:migrate": "tsx ../../packages/db-kit/scripts/migrate-cli.ts --folder=./drizzle"
   },
   "devDependencies": {
-    "drizzle-kit": "^0.30.1",
     "tsx": "^4.22.4",
     "typescript": "^5.7.2"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.1.0",
+    "@neondatabase/serverless": "1.1.0",
     "@skarion/db-kit": "workspace:*",
-    "drizzle-orm": "^0.45.2",
-    "hono": "^4.12.26"
+    "drizzle-orm": "0.45.2",
+    "hash-wasm": "^4.12.0",
+    "hono": "^4.12.26",
+    "kysely": "0.29.2"
   }
 }
