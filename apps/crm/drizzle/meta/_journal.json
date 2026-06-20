@@ -8,6 +8,13 @@
       "when": 1781982343059,
       "tag": "0000_hard_night_thrasher",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781992183701,
+      "tag": "0001_mute_silhouette",
+      "breakpoints": true
     }
   ]
 }

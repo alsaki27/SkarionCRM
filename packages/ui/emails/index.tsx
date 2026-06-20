@@ -19,6 +19,21 @@ import {
   welcomeAfterInvitePreheader,
   welcomeAfterInviteSubject,
 } from './WelcomeAfterInvite.js';
+import {
+  TaskDueReminderEmail,
+  taskDueReminderPreheader,
+  taskDueReminderSubject,
+} from './TaskDueReminder.js';
+import {
+  LeadAssignedEmail,
+  leadAssignedPreheader,
+  leadAssignedSubject,
+} from './LeadAssigned.js';
+import {
+  OpportunityStageChangedEmail,
+  opportunityStageChangedPreheader,
+  opportunityStageChangedSubject,
+} from './OpportunityStageChanged.js';
 
 export interface RenderedEmail {
   subject: string;
@@ -74,5 +89,54 @@ export async function renderWelcomeAfterInviteEmail(props: {
   };
 }
 
+export async function renderTaskDueReminder(props: {
+  assigneeName: string;
+  taskTitle: string;
+  dueDate: string;
+  taskUrl: string;
+}): Promise<RenderedEmail> {
+  const { html, text } = await renderBoth(<TaskDueReminderEmail {...props} />);
+  return {
+    subject: taskDueReminderSubject(props.taskTitle),
+    preheader: taskDueReminderPreheader,
+    html,
+    text,
+  };
+}
+
+export async function renderLeadAssigned(props: {
+  assigneeName: string;
+  leadName: string;
+  leadEmail: string;
+  source: string;
+  leadUrl: string;
+}): Promise<RenderedEmail> {
+  const { html, text } = await renderBoth(<LeadAssignedEmail {...props} />);
+  return {
+    subject: leadAssignedSubject(props.leadName),
+    preheader: leadAssignedPreheader,
+    html,
+    text,
+  };
+}
+
+export async function renderOpportunityStageChanged(props: {
+  ownerName: string;
+  opportunityName: string;
+  oldStage: string;
+  newStage: string;
+  amount?: string;
+  opportunityUrl: string;
+}): Promise<RenderedEmail> {
+  const { html, text } = await renderBoth(<OpportunityStageChangedEmail {...props} />);
+  return {
+    subject: opportunityStageChangedSubject(props.opportunityName, props.newStage),
+    preheader: opportunityStageChangedPreheader,
+    html,
+    text,
+  };
+}
+
 export { InvitationEmail, PasswordResetEmail, MfaEnrolledEmail, WelcomeAfterInviteEmail };
+export { TaskDueReminderEmail, LeadAssignedEmail, OpportunityStageChangedEmail };
 export { EmailLayout } from './EmailLayout.js';

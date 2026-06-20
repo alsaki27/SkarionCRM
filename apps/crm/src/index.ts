@@ -12,6 +12,30 @@ interface Env {
   DATABASE_URL: string;
   JWT_SECRET: string;
   APP_URL: string;
+  RESEND_API_KEY?: string;
+  WORKFLOW_RUNNER_URL?: string;
+}
+
+/** Basic email stub — logs what would be sent. Full Resend wiring in a future ticket. */
+function logEmailStub(to: string, subject: string, _html: string) {
+  console.log(`[EMAIL_STUB] to=${to} subject="${subject}" — not sent (Resend not configured)`);
+}
+
+/** Trigger workflow event evaluation (stub if WORKFLOW_RUNNER_URL not set). */
+async function triggerWorkflowEvent(env: Env, trigger: string, payload: Record<string, unknown>) {
+  if (!env.WORKFLOW_RUNNER_URL) {
+    console.log(`[WORKFLOW_STUB] trigger=${trigger} payload=${JSON.stringify(payload)}`);
+    return;
+  }
+  try {
+    await fetch(`${env.WORKFLOW_RUNNER_URL}/evaluate-event`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trigger, payload }),
+    });
+  } catch (err) {
+    console.error('Workflow event trigger failed:', err);
+  }
 }
 
 function isAllowedOrigin(origin: string, appUrl: string): boolean {
@@ -419,6 +443,18 @@ app.post("/api/leads", async (c) => {
     app: "crm",
   });
 
+  // Trigger workflow event for lead_created rules
+  c.executionCtx.waitUntil(
+    triggerWorkflowEvent(c.env, 'lead_created', {
+      id: result.id,
+      source: result.source,
+      ownerId: result.ownerId,
+    })
+  );
+
+  // Basic email stub — will be wired to Resend in a future ticket
+  logEmailStub(result.email, 'New lead in Skarion CRM', 'Welcome to Skarion CRM');
+
   return c.json({ lead: result }, 201);
 });
 
@@ -732,6 +768,15 @@ app.put("/api/opportunities/:id", async (c) => {
     app: "crm",
   });
 
+  // Basic email stub on stage change — will be wired to Resend in a future ticket
+  if (body.stage !== undefined && body.stage !== existing.stage) {
+    logEmailStub(
+      caller.userId,
+      `Opportunity stage changed: ${result.name} → ${result.stage}`,
+      `Opportunity ${result.name} moved from ${existing.stage} to ${result.stage}`
+    );
+  }
+
   return c.json({ opportunity: result });
 });
 
@@ -978,6 +1023,15 @@ app.post("/api/tasks", async (c) => {
     after: data,
     app: "crm",
   });
+
+  // Basic email stub on task assignment — will be wired to Resend in a future ticket
+  if (result.assigneeId !== caller.userId) {
+    logEmailStub(
+      result.assigneeId,
+      `New task assigned: ${result.title}`,
+      `You have been assigned a new task: ${result.title}`
+    );
+  }
 
   return c.json({ task: result }, 201);
 });
@@ -1263,6 +1317,147 @@ app.get("/api/admin/audit-log", async (c) => {
     .orderBy(desc(schema.auditLog.createdAt))
     .limit(200);
   return c.json({ auditLog: rows });
+});
+
+// --- WORKFLOW RULES ---
+
+app.get("/api/workflow-rules", async (c) => {
+  const db = getDb(c.env, schema) as CrmDb;
+  const role = getRole(c);
+  if (!role) return c.json({ error: "Forbidden." }, 403);
+
+  const rows = await db.select().from(schema.workflowRules)
+    .orderBy(desc(schema.workflowRules.updatedAt))
+    .limit(100);
+  return c.json({ workflowRules: rows });
+});
+
+app.post("/api/workflow-rules", async (c) => {
+  const db = getDb(c.env, schema) as CrmDb;
+  const role = getRole(c);
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
+  if (!can(isSuperadmin, role, "create", { ownerId: caller.userId }, caller)) {
+    return c.json({ error: "Forbidden." }, 403);
+  }
+
+  const body = await c.req.json();
+  const data = {
+    name: body.name,
+    trigger: body.trigger,
+    conditions: body.conditions ?? {},
+    actions: body.actions ?? {},
+    enabled: body.enabled ?? true,
+  };
+
+  const [result] = await db.insert(schema.workflowRules).values(data).returning();
+  if (!result) return c.json({ error: "Internal error" }, 500);
+  return c.json({ workflowRule: result }, 201);
+});
+
+app.put("/api/workflow-rules/:id", async (c) => {
+  const db = getDb(c.env, schema) as CrmDb;
+  const id = c.req.param("id");
+  const role = getRole(c);
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
+
+  const [existing] = await db.select().from(schema.workflowRules).where(eq(schema.workflowRules.id, id));
+  if (!existing) return c.json({ error: "Not found." }, 404);
+  if (!can(isSuperadmin, role, "edit", { ownerId: caller.userId }, caller)) {
+    return c.json({ error: "Forbidden." }, 403);
+  }
+
+  const body = await c.req.json();
+  const update: Record<string, unknown> = {};
+  if (body.name !== undefined) update.name = body.name;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (body.trigger !== undefined) update.trigger = body.trigger as any;
+  if (body.conditions !== undefined) update.conditions = body.conditions;
+  if (body.actions !== undefined) update.actions = body.actions;
+  if (body.enabled !== undefined) update.enabled = body.enabled;
+  update.updatedAt = new Date();
+
+  const [result] = await db.update(schema.workflowRules).set(update).where(eq(schema.workflowRules.id, id)).returning();
+  return c.json({ workflowRule: result });
+});
+
+app.delete("/api/workflow-rules/:id", async (c) => {
+  const db = getDb(c.env, schema) as CrmDb;
+  const id = c.req.param("id");
+  const role = getRole(c);
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
+
+  const [existing] = await db.select().from(schema.workflowRules).where(eq(schema.workflowRules.id, id));
+  if (!existing) return c.json({ error: "Not found." }, 404);
+  if (!can(isSuperadmin, role, "delete", { ownerId: caller.userId }, caller)) {
+    return c.json({ error: "Forbidden." }, 403);
+  }
+
+  await db.delete(schema.workflowRules).where(eq(schema.workflowRules.id, id));
+  return c.json({ success: true });
+});
+
+// --- INTEGRATIONS ---
+
+app.get("/api/integrations", async (c) => {
+  const db = getDb(c.env, schema) as CrmDb;
+  const role = getRole(c);
+  if (!role) return c.json({ error: "Forbidden." }, 403);
+
+  const rows = await db.select().from(schema.integrationConfigs)
+    .orderBy(desc(schema.integrationConfigs.updatedAt));
+  return c.json({ integrations: rows });
+});
+
+app.post("/api/integrations", async (c) => {
+  const db = getDb(c.env, schema) as CrmDb;
+  const isSuperadmin = c.get("isSuperadmin");
+  if (!isSuperadmin) return c.json({ error: "Forbidden." }, 403);
+
+  const body = await c.req.json();
+  const data = {
+    provider: body.provider,
+    label: body.label,
+    status: body.status ?? "disconnected",
+    settings: body.settings ?? {},
+  };
+
+  const [result] = await db.insert(schema.integrationConfigs).values(data).returning();
+  if (!result) return c.json({ error: "Internal error" }, 500);
+  return c.json({ integration: result }, 201);
+});
+
+app.put("/api/integrations/:id", async (c) => {
+  const db = getDb(c.env, schema) as CrmDb;
+  const id = c.req.param("id");
+  const isSuperadmin = c.get("isSuperadmin");
+  if (!isSuperadmin) return c.json({ error: "Forbidden." }, 403);
+
+  const [existing] = await db.select().from(schema.integrationConfigs).where(eq(schema.integrationConfigs.id, id));
+  if (!existing) return c.json({ error: "Not found." }, 404);
+
+  const body = await c.req.json();
+  const update: Record<string, unknown> = {};
+  if (body.label !== undefined) update.label = body.label;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (body.status !== undefined) update.status = body.status as any;
+  if (body.settings !== undefined) update.settings = body.settings;
+  update.updatedAt = new Date();
+
+  const [result] = await db.update(schema.integrationConfigs).set(update).where(eq(schema.integrationConfigs.id, id)).returning();
+  return c.json({ integration: result });
+});
+
+app.delete("/api/integrations/:id", async (c) => {
+  const db = getDb(c.env, schema) as CrmDb;
+  const id = c.req.param("id");
+  const isSuperadmin = c.get("isSuperadmin");
+  if (!isSuperadmin) return c.json({ error: "Forbidden." }, 403);
+
+  await db.delete(schema.integrationConfigs).where(eq(schema.integrationConfigs.id, id));
+  return c.json({ success: true });
 });
 
 export default app;

@@ -1,7 +1,7 @@
 import { sql, relations } from "drizzle-orm";
 import {
   pgSchema, text, timestamp, uuid, index, uniqueIndex, jsonb, inet,
-  integer, decimal, date,
+  integer, decimal, date, boolean,
 } from "drizzle-orm/pg-core";
 
 function timestamps() {
@@ -212,6 +212,56 @@ export const auditLog = crmSchema.table(
   ]
 );
 
+// ─────────────────────────────────────────────────────────
+// workflow_rules
+// ─────────────────────────────────────────────────────────
+export const workflowTriggerEnum = crmSchema.enum("workflow_trigger", [
+  "lead_created",
+  "opportunity_stale",
+  "task_due_soon",
+]);
+
+export const workflowRules = crmSchema.table(
+  "workflow_rules",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull(),
+    trigger: workflowTriggerEnum("trigger").notNull(),
+    conditions: jsonb("conditions").notNull(), // e.g. { source: "website", stage: "prospecting" }
+    actions: jsonb("actions").notNull(), // e.g. { assignTo: "uuid", createTask: { title: "..." } }
+    enabled: boolean("enabled").default(true).notNull(),
+    ...timestamps(),
+  },
+  (table) => [
+    index("idx_workflow_rules_trigger").on(table.trigger),
+    index("idx_workflow_rules_enabled").on(table.enabled),
+  ]
+);
+
+// ─────────────────────────────────────────────────────────
+// integration_configs
+// ─────────────────────────────────────────────────────────
+export const integrationStatusEnum = crmSchema.enum("integration_status", [
+  "connected",
+  "disconnected",
+  "error",
+]);
+
+export const integrationConfigs = crmSchema.table(
+  "integration_configs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    provider: text("provider").notNull(), // e.g. "slack", "gmail", "outlook"
+    label: text("label").notNull(),
+    status: integrationStatusEnum("status").default("disconnected").notNull(),
+    settings: jsonb("settings"), // encrypted tokens / config per provider
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex("idx_integrations_provider").on(table.provider),
+  ]
+);
+
 
 
 export const companiesRelations = relations(companies, ({ many }) => ({
@@ -244,3 +294,7 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
   company: one(companies, { fields: [tasks.companyId], references: [companies.id] }),
   opportunity: one(opportunities, { fields: [tasks.opportunityId], references: [opportunities.id] }),
 }));
+
+export const workflowRulesRelations = relations(workflowRules, () => ({}));
+
+export const integrationConfigsRelations = relations(integrationConfigs, () => ({}));

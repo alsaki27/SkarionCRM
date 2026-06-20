@@ -1,0 +1,14 @@
+name = "skarion-workflow-runner"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[vars]
+CRM_API_URL = "https://skarion-crm.pages.dev"
+
+[env.staging.vars]
+CRM_API_URL = "https://skarion-crm-staging.pages.dev"

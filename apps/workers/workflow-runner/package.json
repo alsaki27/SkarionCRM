@@ -11,7 +11,15 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0"
   },
+  "dependencies": {
+    "@skarion/db-kit": "workspace:*",
+    "@skarion/crm": "workspace:*",
+    "@neondatabase/serverless": "1.1.0",
+    "drizzle-orm": "0.45.2",
+    "hono": "^4.12.26"
+  },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260620.1",
     "typescript": "^5.7.2"
   }
 }

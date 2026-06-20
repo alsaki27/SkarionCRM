@@ -4,6 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./db/schema": "./src/db/schema.ts",
+    "./db/types": "./src/db/types.ts"
+  },
   "scripts": {
     "build": "echo '(stub) no build yet for @skarion/crm'",
     "dev": "echo '(stub) no dev yet for @skarion/crm'",

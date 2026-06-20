@@ -1,0 +1,17 @@
+name = "skarion-cron"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[triggers]
+crons = ["0 * * * *"]
+
+[vars]
+WORKFLOW_RUNNER_URL = "https://skarion-workflow-runner.alsaki1999.workers.dev"
+
+[env.staging.vars]
+WORKFLOW_RUNNER_URL = "https://skarion-workflow-runner-staging.alsaki1999.workers.dev"
