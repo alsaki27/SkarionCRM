@@ -124,6 +124,112 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+export function useSummarizeLead(id: string) {
+  return useMutation({
+    mutationFn: async () => {
+      return crmFetch<{ summary: string }>(`/api/leads/${id}/summarize`, { method: 'POST' });
+    },
+  });
+}
+
+export function useDraftOutreach(id: string) {
+  return useMutation({
+    mutationFn: async (opts: { tone: string; channel: string }) => {
+      return crmFetch<{ draft: string }>(`/api/leads/${id}/outreach`, {
+        method: 'POST',
+        body: JSON.stringify(opts),
+      });
+    },
+  });
+}
+
+export function useScoreLead(id: string) {
+  return useMutation({
+    mutationFn: async () => {
+      return crmFetch<{ score: number; reasoning: string }>(`/api/leads/${id}/score`, { method: 'POST' });
+    },
+  });
+}
+
+export function useSuggestNextAction(id: string) {
+  return useMutation({
+    mutationFn: async () => {
+      return crmFetch<{ suggestion: string }>(`/api/leads/${id}/suggest-next-action`, { method: 'POST' });
+    },
+  });
+}
+
+export function useSummarizeCompany(id: string) {
+  return useMutation({
+    mutationFn: async () => {
+      return crmFetch<{ summary: string }>(`/api/companies/${id}/summarize`, { method: 'POST' });
+    },
+  });
+}
+
+export function useSummarizeContact(id: string) {
+  return useMutation({
+    mutationFn: async () => {
+      return crmFetch<{ summary: string }>(`/api/contacts/${id}/summarize`, { method: 'POST' });
+    },
+  });
+}
+
+// ─── PDF IMPORT ───
+
+export interface PdfImportResult {
+  draftLead: {
+    leadType: string;
+    firstName: string;
+    lastName: string;
+    fullName: string;
+    email: string;
+    phone: string;
+    linkedinUrl: string;
+    companyName: string;
+    title: string;
+    location: string;
+    website: string;
+    source: string;
+    status: string;
+    tags: string[];
+    notes: string;
+    summary: string;
+    confidence: number;
+    missingFields: string[];
+  };
+  duplicates: { id: string; firstName: string; lastName: string; email: string; phone: string | null }[];
+  rawTextPreview: string;
+}
+
+export function useImportPdf() {
+  return useMutation({
+    mutationFn: async (formData: FormData) => {
+      return crmFetch<PdfImportResult>('/api/leads/import/pdf', {
+        method: 'POST',
+        body: formData,
+      });
+    },
+  });
+}
+
+export function useConfirmPdfImport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { lead: Record<string, unknown>; force?: boolean; createCompany?: boolean; createContact?: boolean }) => {
+      return crmFetch<{ lead: Lead; contactId: string | null; companyId: string | null }>('/api/leads/import/pdf/confirm', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['leads'] });
+      qc.invalidateQueries({ queryKey: ['contacts'] });
+      qc.invalidateQueries({ queryKey: ['companies'] });
+    },
+  });
+}
+
 export function useChatHistory() {
   return useCrmQuery(['chat', 'history'], () =>
     crmFetch<{ messages: ChatMessage[] }>('/api/chat/history')
@@ -144,3 +250,4 @@ export function useSendChatMessage() {
     },
   });
 }
+

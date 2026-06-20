@@ -1,0 +1,50 @@
+name: Deploy Cron Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/workers/cron/**'
+      - 'packages/db-kit/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-cron.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-cron-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy cron Worker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/workers/cron
+          command: deploy
+
+      - name: Set WORKFLOW_RUNNER_SECRET secret
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/workers/cron
+          command: secret put WORKFLOW_RUNNER_SECRET --value "${{ secrets.WORKFLOW_RUNNER_SECRET }}"
+
+      - name: Set WORKFLOW_RUNNER_URL variable
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/workers/cron
+          command: vars put WORKFLOW_RUNNER_URL --value "https://skarion-workflow-runner.alsaki1999.workers.dev"

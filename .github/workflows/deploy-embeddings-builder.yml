@@ -1,0 +1,58 @@
+name: Deploy Embeddings Builder
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/workers/embeddings-builder/**'
+      - 'packages/db-kit/**'
+      - 'apps/crm/src/db/schema.ts'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-embeddings-builder.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-embeddings-builder-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy embeddings-builder Worker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @skarion/crm typecheck
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/workers/embeddings-builder
+          command: deploy
+
+      - name: Set DATABASE_URL secret
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/workers/embeddings-builder
+          command: secret put DATABASE_URL --value "${{ secrets.DATABASE_URL }}"
+      - name: Set GOOGLE_API_KEY secret
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/workers/embeddings-builder
+          command: secret put GOOGLE_API_KEY --value "${{ secrets.GOOGLE_API_KEY }}"
+      - name: Set GOOGLE_EMBEDDING_MODEL secret
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/workers/embeddings-builder
+          command: secret put GOOGLE_EMBEDDING_MODEL --value "${{ secrets.GOOGLE_EMBEDDING_MODEL }}"

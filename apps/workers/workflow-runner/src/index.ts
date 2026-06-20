@@ -11,12 +11,25 @@ import type { CrmDb } from '@skarion/crm/db/types';
 
 interface Env {
   DATABASE_URL: string;
-  CRM_API_URL: string; // e.g. https://skarion-crm.pages.dev or workers.dev
+  CRM_API_URL: string;
+  WORKFLOW_RUNNER_SECRET?: string; // optional shared secret for cron-worker auth
 }
 
 const app = new Hono<{ Bindings: Env }>();
 
 app.get('/health', (c) => c.json({ status: 'ok', service: 'skarion-workflow-runner' }));
+
+// Simple shared-secret auth for cron-worker calls. CRM API calls (evaluate-event)
+// don't send a secret and are allowed through — they come from the same account.
+app.use('/evaluate/*', async (c, next) => {
+  const secret = c.env.WORKFLOW_RUNNER_SECRET;
+  if (!secret) return next(); // not configured → allow all
+  const auth = c.req.header('Authorization');
+  if (auth !== `Bearer ${secret}`) {
+    return c.json({ error: 'Unauthorized.' }, 401);
+  }
+  await next();
+});
 
 // ── Evaluate time-based rules (called by cron worker) ──
 app.post('/evaluate/:trigger', async (c) => {

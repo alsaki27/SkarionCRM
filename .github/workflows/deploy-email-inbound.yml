@@ -1,0 +1,49 @@
+name: Deploy Email Inbound Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/workers/email-inbound/**'
+      - 'packages/db-kit/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-email-inbound.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-email-inbound-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy email-inbound Worker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/workers/email-inbound
+          command: deploy
+
+      - name: Set DATABASE_URL secret
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/workers/email-inbound
+          command: secret put DATABASE_URL --value "${{ secrets.DATABASE_URL }}"
+      - name: Set RESEND_API_KEY secret
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/workers/email-inbound
+          command: secret put RESEND_API_KEY --value "${{ secrets.RESEND_API_KEY }}"

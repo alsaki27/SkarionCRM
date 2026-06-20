@@ -7,6 +7,7 @@ import { parseContactsCsv, parseCompaniesCsv, parseLeadsCsv } from "@skarion/imp
 import * as schema from "./db/schema.js";
 import { eq, and, isNull, like, sql, desc, asc } from "drizzle-orm";
 import type { CrmDb } from "./db/types.js";
+import * as ai from "./lib/ai-service.js";
 
 interface Env {
   DATABASE_URL: string;
@@ -45,6 +46,15 @@ function isAllowedOrigin(origin: string, appUrl: string): boolean {
   if (!origin) return false;
   if (origin === appUrl) return true;
   if (origin.endsWith(".skarion.com")) return true;
+  // Allow known Cloudflare Pages/Workers origins (shared-domain stopgap until custom domains)
+  const knownCloudflareOrigins = new Set([
+    'https://skarion-crm.pages.dev',
+    'https://skarion-identity-login.pages.dev',
+    'https://skarion-identity-admin.pages.dev',
+    'https://skarion-identity.alsaki1999.workers.dev',
+    'https://skarion-crm-platform.alsaki1999.workers.dev',
+  ]);
+  if (knownCloudflareOrigins.has(origin)) return true;
   if (origin.startsWith("http://localhost:")) return true;
   return false;
 }
@@ -1499,65 +1509,6 @@ app.delete("/api/integrations/:id", async (c) => {
 
 // ─── CHAT ────────────────────────────────────────────────────────────────
 
-// Cosine similarity between two float arrays (stored as JSONB).
-function cosineSimilarity(a: number[], b: number[]): number {
-  let dot = 0, na = 0, nb = 0;
-  for (let i = 0; i < a.length; i++) {
-    const ai = a[i]!;
-    const bi = b[i]!;
-    dot += ai * bi;
-    na += ai * ai;
-    nb += bi * bi;
-  }
-  return dot / (Math.sqrt(na) * Math.sqrt(nb));
-}
-
-// Fetch embedding from Google Gemini. Falls back to null if key is missing.
-async function getEmbedding(text: string, env: Env): Promise<number[] | null> {
-  if (!env.GOOGLE_API_KEY) return null;
-  const model = env.GOOGLE_EMBEDDING_MODEL || 'embedding-001';
-  try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent?key=${env.GOOGLE_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: `models/${model}`,
-        content: { parts: [{ text }] },
-      }),
-    });
-    if (!res.ok) { console.error('Google embedding error:', await res.text()); return null; }
-    const data = (await res.json()) as { embedding?: { values?: number[] } };
-    return data.embedding?.values ?? null;
-  } catch (err) {
-    console.error('Embedding fetch failed:', err);
-    return null;
-  }
-}
-
-// Google Gemini chat completion. Falls back to null if key is missing.
-async function chatCompletion(prompt: string, env: Env): Promise<string | null> {
-  if (!env.GOOGLE_API_KEY) return null;
-  const model = env.GOOGLE_CHAT_MODEL || 'gemini-1.5-flash';
-  try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GOOGLE_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          { role: 'user', parts: [{ text: `You are a helpful CRM assistant. Answer based on the provided context. If the answer is not in the context, say so.\n\n${prompt}` }] },
-        ],
-        generationConfig: { temperature: 0.3 },
-      }),
-    });
-    if (!res.ok) { console.error('Google chat error:', await res.text()); return null; }
-    const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-    return data.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
-  } catch (err) {
-    console.error('Chat completion failed:', err);
-    return null;
-  }
-}
-
 app.get('/api/chat/history', async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const userId = c.get('userId');
@@ -1579,7 +1530,7 @@ app.post('/api/chat', async (c) => {
   if (!message) return c.json({ error: 'Message is required.' }, 400);
 
   // 1. Embed the user's question
-  const queryEmbedding = await getEmbedding(message, c.env);
+  const queryEmbedding = await ai.getEmbedding(message, c.env);
 
   // 2. Retrieve all candidate embeddings
   const allEmbeddings = await db.select().from(schema.embeddings);
@@ -1589,7 +1540,7 @@ app.post('/api/chat', async (c) => {
     .map((e) => ({
       ...e,
       score: queryEmbedding && Array.isArray(e.embedding)
-        ? cosineSimilarity(queryEmbedding, e.embedding as number[])
+        ? ai.cosineSimilarity(queryEmbedding, e.embedding as number[])
         : 0,
     }))
     .filter((e) => canList(isSuperadmin, role, { userId: userId, isSuperadmin }, e.ownerId))
@@ -1608,9 +1559,9 @@ app.post('/api/chat', async (c) => {
   });
 
   // 6. Call LLM
-  let answer = await chatCompletion(prompt, c.env);
+  let answer = await ai.chatCompletionSingle(prompt, c.env);
   if (!answer) {
-    answer = '[AI assistant is not configured. Add GOOGLE_API_KEY to enable chat.]';
+    answer = ai.AI_NOT_CONFIGURED_MSG;
   }
 
   // 7. Persist assistant response
@@ -1624,5 +1575,409 @@ app.post('/api/chat', async (c) => {
 
   return c.json({ answer, context: scored, message: assistantMessage });
 });
+
+// ─── AI SUMMARY / OUTREACH / SCORE ─────────────────────────────────────────
+
+app.post('/api/leads/:id/summarize', async (c) => {
+  const db = getDb(c.env, schema) as CrmDb;
+  const id = c.req.param('id');
+  const role = getRole(c);
+  const isSuperadmin = c.get('isSuperadmin');
+  const caller = { userId: c.get('userId'), isSuperadmin };
+
+  const [row] = await db.select().from(schema.leads)
+    .where(and(eq(schema.leads.id, id), isNull(schema.leads.deletedAt)));
+  if (!row) return c.json({ error: 'Not found.' }, 404);
+  if (!can(isSuperadmin, role, 'view', { ownerId: row.ownerId }, caller)) {
+    return c.json({ error: 'Forbidden.' }, 403);
+  }
+
+  const summary = await ai.summarizeLead(row, c.env);
+  if (!summary) return c.json({ error: ai.AI_NOT_CONFIGURED_MSG }, 503);
+  return c.json({ summary });
+});
+
+app.post('/api/leads/:id/outreach', async (c) => {
+  const db = getDb(c.env, schema) as CrmDb;
+  const id = c.req.param('id');
+  const role = getRole(c);
+  const isSuperadmin = c.get('isSuperadmin');
+  const caller = { userId: c.get('userId'), isSuperadmin };
+
+  const [row] = await db.select().from(schema.leads)
+    .where(and(eq(schema.leads.id, id), isNull(schema.leads.deletedAt)));
+  if (!row) return c.json({ error: 'Not found.' }, 404);
+  if (!can(isSuperadmin, role, 'view', { ownerId: row.ownerId }, caller)) {
+    return c.json({ error: 'Forbidden.' }, 403);
+  }
+
+  const body = await c.req.json();
+  const draft = await ai.draftOutreach({
+    leadType: row.source ?? 'other',
+    leadSource: row.source ?? 'other',
+    firstName: row.firstName,
+    lastName: row.lastName,
+    companyName: row.companyName,
+    title: null,
+    notes: row.notes,
+    pdfSummary: null,
+    tone: body.tone ?? 'professional',
+    channel: body.channel ?? 'email',
+  }, c.env);
+  if (!draft) return c.json({ error: ai.AI_NOT_CONFIGURED_MSG }, 503);
+
+  // Save as activity
+  await db.insert(schema.activities).values({
+    type: 'note',
+    subject: `AI outreach draft (${body.channel ?? 'email'})`,
+    content: draft,
+    contactId: null,
+    companyId: null,
+    opportunityId: null,
+    actorId: caller.userId,
+    happenedAt: new Date(),
+  });
+
+  return c.json({ draft });
+});
+
+app.post('/api/leads/:id/score', async (c) => {
+  const db = getDb(c.env, schema) as CrmDb;
+  const id = c.req.param('id');
+  const role = getRole(c);
+  const isSuperadmin = c.get('isSuperadmin');
+  const caller = { userId: c.get('userId'), isSuperadmin };
+
+  const [row] = await db.select().from(schema.leads)
+    .where(and(eq(schema.leads.id, id), isNull(schema.leads.deletedAt)));
+  if (!row) return c.json({ error: 'Not found.' }, 404);
+  if (!can(isSuperadmin, role, 'view', { ownerId: row.ownerId }, caller)) {
+    return c.json({ error: 'Forbidden.' }, 403);
+  }
+
+  const result = await ai.scoreLead(row, c.env);
+  if (!result) return c.json({ error: ai.AI_NOT_CONFIGURED_MSG }, 503);
+  return c.json(result);
+});
+
+app.post('/api/leads/:id/suggest-next-action', async (c) => {
+  const db = getDb(c.env, schema) as CrmDb;
+  const id = c.req.param('id');
+  const role = getRole(c);
+  const isSuperadmin = c.get('isSuperadmin');
+  const caller = { userId: c.get('userId'), isSuperadmin };
+
+  const [row] = await db.select().from(schema.leads)
+    .where(and(eq(schema.leads.id, id), isNull(schema.leads.deletedAt)));
+  if (!row) return c.json({ error: 'Not found.' }, 404);
+  if (!can(isSuperadmin, role, 'view', { ownerId: row.ownerId }, caller)) {
+    return c.json({ error: 'Forbidden.' }, 403);
+  }
+
+  const suggestion = await ai.suggestNextAction(row, c.env);
+  if (!suggestion) return c.json({ error: ai.AI_NOT_CONFIGURED_MSG }, 503);
+  return c.json({ suggestion });
+});
+
+app.post('/api/companies/:id/summarize', async (c) => {
+  const db = getDb(c.env, schema) as CrmDb;
+  const id = c.req.param('id');
+  const role = getRole(c);
+  const isSuperadmin = c.get('isSuperadmin');
+  const caller = { userId: c.get('userId'), isSuperadmin };
+
+  const [row] = await db.select().from(schema.companies)
+    .where(and(eq(schema.companies.id, id), isNull(schema.companies.deletedAt)));
+  if (!row) return c.json({ error: 'Not found.' }, 404);
+  if (!can(isSuperadmin, role, 'view', { ownerId: row.ownerId }, caller)) {
+    return c.json({ error: 'Forbidden.' }, 403);
+  }
+
+  const summary = await ai.summarizeCompany(row, c.env);
+  if (!summary) return c.json({ error: ai.AI_NOT_CONFIGURED_MSG }, 503);
+  return c.json({ summary });
+});
+
+app.post('/api/contacts/:id/summarize', async (c) => {
+  const db = getDb(c.env, schema) as CrmDb;
+  const id = c.req.param('id');
+  const role = getRole(c);
+  const isSuperadmin = c.get('isSuperadmin');
+  const caller = { userId: c.get('userId'), isSuperadmin };
+
+  const [row] = await db.select().from(schema.contacts)
+    .where(and(eq(schema.contacts.id, id), isNull(schema.contacts.deletedAt)));
+  if (!row) return c.json({ error: 'Not found.' }, 404);
+  if (!can(isSuperadmin, role, 'view', { ownerId: row.ownerId }, caller)) {
+    return c.json({ error: 'Forbidden.' }, 403);
+  }
+
+  const [company] = row.companyId
+    ? await db.select().from(schema.companies).where(eq(schema.companies.id, row.companyId))
+    : [null];
+
+  const summary = await ai.summarizeContact({
+    firstName: row.firstName,
+    lastName: row.lastName,
+    email: row.email,
+    title: row.title,
+    companyName: company?.name ?? null,
+  }, c.env);
+  if (!summary) return c.json({ error: ai.AI_NOT_CONFIGURED_MSG }, 503);
+  return c.json({ summary });
+});
+
+// ─── PDF LEAD IMPORT ───────────────────────────────────────────────────────
+
+app.post('/api/leads/import/pdf', async (c) => {
+  const db = getDb(c.env, schema) as CrmDb;
+  const role = getRole(c);
+  const isSuperadmin = c.get('isSuperadmin');
+  const caller = { userId: c.get('userId'), isSuperadmin };
+  if (!can(isSuperadmin, role, 'create', { ownerId: caller.userId }, caller)) {
+    return c.json({ error: 'Forbidden.' }, 403);
+  }
+
+  const body = await c.req.parseBody();
+  const file = body['file'] as File | undefined;
+  const leadType = (body['leadType'] as string) ?? 'other';
+
+  if (!file) return c.json({ error: 'Missing file.' }, 400);
+  if (file.type !== 'application/pdf') return c.json({ error: 'Only PDF files are accepted.' }, 400);
+  if (file.size > 10 * 1024 * 1024) return c.json({ error: 'File too large. Max 10MB.' }, 400);
+
+  const arrayBuffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+
+  // Try to extract text from PDF (basic text extraction, no OCR)
+  const rawText = extractTextFromPdf(bytes);
+  if (!rawText || rawText.trim().length === 0) {
+    return c.json({ error: 'No selectable text found in PDF. OCR is not implemented yet. Please upload a text-based PDF.' }, 422);
+  }
+
+  // Regex extraction for common fields
+  const regexResult = regexExtractFromText(rawText);
+
+  // AI extraction if key is available
+  let aiResult: ai.ExtractedLeadDraft | null = null;
+  if (c.env.GOOGLE_API_KEY) {
+    aiResult = await ai.extractLeadFromPdfText(rawText, leadType, c.env);
+  }
+
+  // Merge regex + AI results (regex wins for email/phone/URL as it's more reliable)
+  const draftLead = mergeExtractionResults(regexResult, aiResult, leadType, rawText);
+
+  // Check for duplicates by email
+  const duplicates: { id: string; firstName: string; lastName: string; email: string; phone: string | null }[] = [];
+  if (draftLead.email) {
+    const byEmail = await db.select().from(schema.leads)
+      .where(and(
+        eq(schema.leads.email, draftLead.email.toLowerCase()),
+        isNull(schema.leads.deletedAt)
+      ));
+    for (const d of byEmail) duplicates.push(d);
+  }
+  if (draftLead.phone) {
+    const byPhone = await db.select().from(schema.contacts)
+      .where(and(
+        eq(schema.contacts.phone, draftLead.phone),
+        isNull(schema.contacts.deletedAt)
+      ));
+    for (const d of byPhone) duplicates.push({ id: d.id, firstName: d.firstName, lastName: d.lastName, email: d.email, phone: d.phone });
+  }
+
+  return c.json({ draftLead, duplicates: duplicates.slice(0, 5), rawTextPreview: rawText.substring(0, 2000) });
+});
+
+app.post('/api/leads/import/pdf/confirm', async (c) => {
+  const db = getDb(c.env, schema) as CrmDb;
+  const role = getRole(c);
+  const isSuperadmin = c.get('isSuperadmin');
+  const caller = { userId: c.get('userId'), isSuperadmin };
+  if (!can(isSuperadmin, role, 'create', { ownerId: caller.userId }, caller)) {
+    return c.json({ error: 'Forbidden.' }, 403);
+  }
+
+  const body = await c.req.json();
+  const leadData = body.lead;
+  if (!leadData || !leadData.email || !leadData.firstName) {
+    return c.json({ error: 'Missing required lead data (email, firstName).' }, 400);
+  }
+
+  // Check for duplicate by email
+  const [existing] = await db.select().from(schema.leads)
+    .where(and(eq(schema.leads.email, leadData.email.toLowerCase()), isNull(schema.leads.deletedAt)));
+  if (existing && !body.force) {
+    return c.json({ error: 'Duplicate lead found.', existing: existing, hint: 'Use force=true to create anyway.' }, 409);
+  }
+
+  // Create or attach company if companyName provided
+  let companyId: string | null = null;
+  if (leadData.companyName) {
+    const [existingCompany] = await db.select().from(schema.companies)
+      .where(and(
+        like(sql`lower(${schema.companies.name})`, `%${leadData.companyName.toLowerCase()}%`),
+        isNull(schema.companies.deletedAt)
+      ));
+    if (existingCompany) {
+      companyId = existingCompany.id;
+    } else if (body.createCompany !== false) {
+      const [newCompany] = await db.insert(schema.companies).values({
+        name: leadData.companyName,
+        domain: leadData.website ?? null,
+        ownerId: caller.userId,
+      }).returning();
+      if (newCompany) companyId = newCompany.id;
+    }
+  }
+
+  // Create contact if requested
+  let contactId: string | null = null;
+  if (body.createContact !== false) {
+    const [contact] = await db.insert(schema.contacts).values({
+      firstName: leadData.firstName,
+      lastName: leadData.lastName,
+      email: leadData.email.toLowerCase(),
+      phone: leadData.phone ?? null,
+      title: leadData.title ?? null,
+      companyId,
+      ownerId: caller.userId,
+    }).returning();
+    if (contact) contactId = contact.id;
+  }
+
+  // Create lead
+  const [lead] = await db.insert(schema.leads).values({
+    firstName: leadData.firstName,
+    lastName: leadData.lastName,
+    email: leadData.email.toLowerCase(),
+    phone: leadData.phone ?? null,
+    companyName: leadData.companyName ?? null,
+    companyDomain: leadData.website ?? null,
+    source: leadData.source ?? 'pdf_upload',
+    status: leadData.status ?? 'new',
+    notes: leadData.notes ?? null,
+    ownerId: caller.userId,
+  }).returning();
+  if (!lead) return c.json({ error: 'Internal error' }, 500);
+
+  await withAudit(db, schema.auditLog, {
+    actorUserId: caller.userId,
+    action: 'create',
+    resourceType: 'lead',
+    resourceId: lead.id,
+    after: lead,
+    app: 'crm',
+  });
+
+  return c.json({ lead, contactId, companyId }, 201);
+});
+
+// ─── PDF TEXT EXTRACTION HELPERS ───────────────────────────────────────────
+
+function extractTextFromPdf(bytes: Uint8Array): string {
+  // Simple PDF text extraction: look for text between BT and ET operators,
+  // and Tj/TJ text show operators. This is a basic heuristic, not a full parser.
+  const decoder = new TextDecoder('utf-8');
+  let text = '';
+
+  // Try UTF-8 first
+  try { text = decoder.decode(bytes); } catch { /* ignore */ }
+  if (!text) text = String.fromCharCode(...bytes);
+
+  // Extract text from common PDF patterns
+  const textMatches: string[] = [];
+  const tjRegex = /\(([\x20-\x7E\s]+)\)\s*Tj/g;
+  let m;
+  while ((m = tjRegex.exec(text)) !== null) {
+    textMatches.push(m[1]!);
+  }
+
+  // Also extract between stream ... endstream
+  const streamRegex = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
+  while ((m = streamRegex.exec(text)) !== null) {
+    const stream = m[1]!;
+    // Look for text in streams
+    const streamTj = /\(([\x20-\x7E\s]+)\)/g;
+    let sm;
+    while ((sm = streamTj.exec(stream)) !== null) {
+      textMatches.push(sm[1]!);
+    }
+  }
+
+  if (textMatches.length > 0) {
+    return textMatches.join(' ');
+  }
+
+  // Fallback: return all printable ASCII text
+  return text.replace(/[^\x20-\x7E\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function regexExtractFromText(text: string) {
+  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+  const phoneRegex = /(?:\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}/g;
+  const linkedInRegex = /(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/[a-zA-Z0-9_-]+/g;
+  const websiteRegex = /(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?/g;
+
+  const emails = [...text.matchAll(emailRegex)].map(m => m[0]);
+  const phones = [...text.matchAll(phoneRegex)].map(m => m[0]);
+  const linkedins = [...text.matchAll(linkedInRegex)].map(m => m[0]);
+  const websites = [...text.matchAll(websiteRegex)].map(m => m[0]);
+
+  // Heuristic: first email is likely the primary one
+  // Heuristic: first line that looks like a name (2-3 words, each capitalized)
+  const lines = text.split(/\n|\r/).map(l => l.trim()).filter(l => l.length > 0);
+  let fullName = '';
+  for (const line of lines.slice(0, 20)) {
+    const nameMatch = line.match(/^([A-Z][a-z]+)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)$/);
+    if (nameMatch) {
+      fullName = line;
+      break;
+    }
+  }
+
+  return {
+    email: emails[0] ?? '',
+    phone: phones[0] ?? '',
+    linkedinUrl: linkedins[0] ?? '',
+    website: websites[0] ?? '',
+    fullName,
+    rawText: text.substring(0, 5000),
+  };
+}
+
+function mergeExtractionResults(
+  regex: ReturnType<typeof regexExtractFromText>,
+  ai: ai.ExtractedLeadDraft | null,
+  leadType: string,
+  _rawText: string
+): ai.ExtractedLeadDraft {
+  const aiName = ai ? `${ai.firstName} ${ai.lastName}`.trim() : '';
+  const nameParts = (regex.fullName || aiName).trim().split(/\s+/);
+  const firstName = nameParts[0] ?? (ai?.firstName ?? '');
+  const lastName = nameParts.slice(1).join(' ') || (ai?.lastName ?? '');
+  const fullName = regex.fullName || aiName || `${firstName} ${lastName}`.trim();
+
+  return {
+    leadType: (ai?.leadType ?? leadType) as ai.ExtractedLeadDraft['leadType'],
+    firstName,
+    lastName,
+    fullName,
+    email: regex.email || (ai?.email ?? ''),
+    phone: regex.phone || (ai?.phone ?? ''),
+    linkedinUrl: regex.linkedinUrl || (ai?.linkedinUrl ?? ''),
+    companyName: ai?.companyName ?? '',
+    title: ai?.title ?? '',
+    location: ai?.location ?? '',
+    website: regex.website || (ai?.website ?? ''),
+    source: 'pdf_upload',
+    status: 'new',
+    tags: ai?.tags ?? [],
+    notes: ai?.notes ?? '',
+    summary: ai?.summary ?? '',
+    confidence: ai?.confidence ?? (regex.email ? 0.3 : 0.05),
+    missingFields: ai?.missingFields ?? [],
+  };
+}
 
 export default app;

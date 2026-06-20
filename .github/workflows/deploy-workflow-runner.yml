@@ -1,0 +1,50 @@
+name: Deploy Workflow Runner
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/workers/workflow-runner/**'
+      - 'packages/db-kit/**'
+      - 'apps/crm/src/db/schema.ts'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-workflow-runner.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-workflow-runner-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy workflow-runner Worker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/workers/workflow-runner
+          command: deploy
+
+      - name: Set DATABASE_URL secret
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/workers/workflow-runner
+          command: secret put DATABASE_URL --value "${{ secrets.DATABASE_URL }}"
+      - name: Set WORKFLOW_RUNNER_SECRET secret
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/workers/workflow-runner
+          command: secret put WORKFLOW_RUNNER_SECRET --value "${{ secrets.WORKFLOW_RUNNER_SECRET }}"

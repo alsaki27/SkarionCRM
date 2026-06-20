@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useLeads, useDeleteEntity } from '../hooks/use-api.js';
 import { useNavigate } from 'react-router-dom';
-import { Target, Plus, Search, Trash2, ArrowRight, Pencil, Upload } from 'lucide-react';
+import { Target, Plus, Search, Trash2, ArrowRight, Pencil, Upload, FileText } from 'lucide-react';
 import { cn } from '../lib/utils.js';
 import LeadForm from '../components/forms/LeadForm.js';
 import ImportModal from '../components/ImportModal.js';
+import PdfImportModal from '../components/PdfImportModal.js';
 import type { Lead } from '../api.js';
 
 export default function LeadsPage() {
@@ -15,6 +16,7 @@ export default function LeadsPage() {
   const [filter, setFilter] = useState<'all' | LeadStatus>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [pdfImportOpen, setPdfImportOpen] = useState(false);
   const [editLead, setEditLead] = useState<Lead | null>(null);
 
   const openCreate = () => { setEditLead(null); setModalOpen(true); };
@@ -49,8 +51,11 @@ export default function LeadsPage() {
           <span className="text-sm text-slate-500">({filtered.length})</span>
         </div>
         <div className="flex gap-2">
+          <button onClick={() => setPdfImportOpen(true)} className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-md text-sm hover:bg-slate-50 text-slate-600">
+            <FileText size={16} /> Add Lead from PDF
+          </button>
           <button onClick={() => setImportOpen(true)} className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-md text-sm hover:bg-slate-50 text-slate-600">
-            <Upload size={16} /> Import
+            <Upload size={16} /> CSV Import
           </button>
           <button onClick={openCreate} className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">
             <Plus size={16} /> Add Lead
@@ -162,6 +167,7 @@ export default function LeadsPage() {
 John,Doe,john@acme.com,+1-555-1234,Acme Inc,acme.com,website
 Jane,Smith,jane@globex.org,+1-555-5678,Globex Corp,globex.org,referral`}
       />
+      <PdfImportModal open={pdfImportOpen} onClose={() => setPdfImportOpen(false)} />
     </div>
   );
 }

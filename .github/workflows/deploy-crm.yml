@@ -1,4 +1,5 @@
-name: deploy-crm
+name: Deploy CRM (Cloudflare)
+
 on:
   push:
     branches: [main]
@@ -10,6 +11,7 @@ on:
       - 'packages/auth-client/**'
       - 'pnpm-lock.yaml'
       - '.github/workflows/deploy-crm.yml'
+  workflow_dispatch:
 
 concurrency:
   group: deploy-crm-${{ github.ref }}
@@ -51,12 +53,6 @@ jobs:
           workingDirectory: apps/crm
           command: deploy
 
-      # `env:` on the deploy step above only sets vars for the GH Actions
-      # runner process - it does NOT inject them into the deployed Worker.
-      # Workers secrets only exist at runtime if pushed via
-      # `wrangler secret put`, same as deploy-identity.yml does. Without
-      # this, c.env.DATABASE_URL and c.env.JWT_SECRET are undefined in the
-      # live Worker - every DB-backed and auth-checked route would fail.
       - name: Set DATABASE_URL secret
         uses: cloudflare/wrangler-action@v3
         with:
@@ -71,6 +67,30 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/crm
           command: secret put JWT_SECRET --value "${{ secrets.JWT_SECRET }}"
+      - name: Set GOOGLE_API_KEY secret
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/crm
+          command: secret put GOOGLE_API_KEY --value "${{ secrets.GOOGLE_API_KEY }}"
+      - name: Set GOOGLE_CHAT_MODEL secret
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/crm
+          command: secret put GOOGLE_CHAT_MODEL --value "${{ secrets.GOOGLE_CHAT_MODEL }}"
+      - name: Set GOOGLE_EMBEDDING_MODEL secret
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/crm
+          command: secret put GOOGLE_EMBEDDING_MODEL --value "${{ secrets.GOOGLE_EMBEDDING_MODEL }}"
 
-  # Pages is deployed via Cloudflare's GitHub integration (auto-build on push).
-  # Project: skarion-crm | Branch: cloudflare-platform-rewrite | Root: apps/crm/web
+  # CRM Pages is deployed via Cloudflare's GitHub integration (auto-build on push).
+  # Project: skarion-crm | Branch: main | Root: apps/crm/web
+  # Required Pages env vars (set in Cloudflare dashboard):
+  #   VITE_API_URL=https://skarion-crm-platform.alsaki1999.workers.dev
+  #   VITE_IDENTITY_API_URL=https://skarion-identity.alsaki1999.workers.dev

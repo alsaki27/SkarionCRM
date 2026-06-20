@@ -1,11 +1,13 @@
 import { useAuthStore, type AuthStore, type CrmRole } from '../../stores/auth.js';
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '../../lib/utils.js';
 import { bootstrapAuth } from '../../api.js';
+import { useChatHistory, useSendChatMessage } from '../../hooks/use-api.js';
 import {
   LayoutDashboard, Users, Building2, Contact, Target, CheckSquare, Settings, LogOut,
   BarChart, ChevronLeft, ChevronRight, Bell, Search, Menu, X, MessageSquare,
+  Sparkles, Bot, User, Send, Loader2, Check, Copy,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -159,6 +161,180 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+      <AiWidget />
     </div>
   );
 }
+
+function AiWidget() {
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState('');
+  const { data: history, isLoading: historyLoading } = useChatHistory();
+  const sendMutation = useSendChatMessage();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState(false);
+
+  const messages = history?.messages ?? [];
+
+  useEffect(() => {
+    if (open) scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages.length, open]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || sendMutation.isPending) return;
+    sendMutation.mutate(input.trim(), { onSuccess: () => setInput('') });
+  };
+
+  const quickPrompts = [
+    { label: 'Summarize this lead', action: () => setInput('Summarize my top leads') },
+    { label: 'Draft follow-up email', action: () => setInput('Draft a follow-up email template') },
+    { label: 'What should I do next?', action: () => setInput('What should I focus on today?') },
+    { label: 'Find missing info', action: () => setInput('Which leads are missing contact info?') },
+    { label: 'Score this lead', action: () => setInput('How do I score leads effectively?') },
+  ];
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <>
+      {!open && (
+        <button
+          onClick={() => setOpen(true)}
+          className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105"
+          aria-label="Open AI assistant"
+        >
+          <Sparkles size={24} />
+        </button>
+      )}
+
+      {open && (
+        <div className="fixed bottom-6 right-6 z-50 w-[400px] max-w-[calc(100vw-3rem)] h-[550px] max-h-[calc(100vh-6rem)] bg-white rounded-xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white">
+                <Bot size={18} />
+              </div>
+              <div>
+                <div className="font-medium text-sm">AI Assistant</div>
+                <div className="text-xs text-slate-500">Powered by Gemini</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setOpen(false)}
+                className="p-1.5 rounded hover:bg-slate-200 text-slate-500"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+
+          {/* Quick prompts */}
+          <div className="px-3 py-2 border-b border-slate-100 flex gap-2 overflow-x-auto scrollbar-hide">
+            {quickPrompts.map((p, i) => (
+              <button
+                key={i}
+                onClick={p.action}
+                className="shrink-0 px-2.5 py-1 text-xs bg-blue-50 text-blue-700 rounded-full hover:bg-blue-100 transition-colors"
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {historyLoading && (
+              <div className="flex items-center justify-center text-slate-400">
+                <Loader2 size={16} className="animate-spin mr-2" /> Loading...
+              </div>
+            )}
+
+            {messages.length === 0 && !historyLoading && (
+              <div className="text-center text-slate-400 py-8">
+                <Bot size={32} className="mx-auto mb-2 text-blue-400" />
+                <p className="text-sm font-medium">How can I help?</p>
+                <p className="text-xs mt-1">Ask about leads, contacts, companies, or opportunities.</p>
+              </div>
+            )}
+
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
+              >
+                <div
+                  className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+                    msg.role === 'user'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {msg.role === 'user' ? <User size={14} /> : <Bot size={14} />}
+                </div>
+                <div className="max-w-[85%]">
+                  <div
+                    className={`rounded-lg px-3 py-2 text-sm relative group ${
+                      msg.role === 'user'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-100 text-slate-800'
+                    }`}
+                  >
+                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                    {msg.role === 'assistant' && (
+                      <button
+                        onClick={() => handleCopy(msg.content)}
+                        className="absolute -top-2 -right-2 p-1 bg-white rounded-full shadow border border-slate-200 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        {copied ? <Check size={12} /> : <Copy size={12} />}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {sendMutation.isPending && (
+              <div className="flex gap-2">
+                <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
+                  <Bot size={14} />
+                </div>
+                <div className="bg-slate-100 rounded-lg px-3 py-2 text-sm text-slate-500">
+                  <Loader2 size={14} className="animate-spin" />
+                </div>
+              </div>
+            )}
+
+            <div ref={scrollRef} />
+          </div>
+
+          {/* Input */}
+          <form onSubmit={handleSubmit} className="p-3 border-t border-slate-200 flex gap-2">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask about your CRM..."
+              className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={sendMutation.isPending}
+            />
+            <button
+              type="submit"
+              disabled={sendMutation.isPending || !input.trim()}
+              className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+            >
+              <Send size={14} />
+            </button>
+          </form>
+        </div>
+      )}
+    </>
+  );
+}
+
