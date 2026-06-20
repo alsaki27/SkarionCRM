@@ -59,6 +59,20 @@ pnpm drizzle-kit generate
 tsx ../../packages/db-kit/scripts/migrate-cli.ts --folder=./drizzle
 ```
 
+## Local testing limitation (important)
+
+`@neondatabase/serverless`'s `neon()` function is **not** a generic Postgres
+driver — it parses the connection string's hostname and calls Neon's HTTPS
+Data API (`https://api.<host>/sql`). It cannot connect to a plain local
+Postgres instance (e.g. `127.0.0.1:5433`); it only works against a real Neon
+database (prod, dev branch, or a PR preview branch). This was confirmed
+directly: `getDb`/`runMigrations` work correctly when pointed at a real Neon
+URL, but throw `Failed to parse URL from https://api.0.0.1/sql` against a
+local host. The schema and migration SQL themselves were validated locally
+by applying the generated `.sql` file directly via `psql` instead — that
+proves the schema design is correct independent of the Neon-specific
+transport, which still needs a real Neon branch to exercise end-to-end.
+
 ## Neon PR branching
 
 See `.github/workflows/neon-branch-preview.yml` at the repo root — creates a
