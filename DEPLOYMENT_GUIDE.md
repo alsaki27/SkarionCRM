@@ -79,6 +79,10 @@ OPENAI_API_KEY=sk-xxxxxxxx
 OPENAI_MODEL=gpt-4o
 RESEND_API_KEY=re_xxxxxxxx
 FROM_EMAIL=noreply@skarion.com
+# Required to use Settings -> AI Providers (admin-managed AI keys, encrypted at rest).
+# Generate with: openssl rand -base64 32. Without it, admins can still configure AI
+# via the OPENAI_API_KEY/KIMI_API_KEY/OLLAMA_URL env vars above, just not from the UI.
+AI_KEYS_ENCRYPTION_SECRET=
 ```
 
 ### Option A: Railway (Recommended for Beginners)
@@ -173,7 +177,10 @@ FROM_EMAIL=noreply@skarion.com
 
 ## 4. AI Setup
 
-SkarionCRM supports both OpenAI and Ollama for AI-powered features.
+SkarionCRM supports OpenAI, Kimi/Moonshot, and Ollama for AI-powered features, plus an
+admin-managed key manager at **Settings -> AI Providers** so admins can add/rotate keys
+from the UI without redeploying. Resolution order: env vars first (OPENAI_API_KEY, then
+KIMI_API_KEY, then OLLAMA_URL), then the highest-priority enabled DB-managed key.
 
 ### OpenAI (Production Recommended)
 
@@ -200,6 +207,28 @@ SkarionCRM supports both OpenAI and Ollama for AI-powered features.
 5. Leave `OPENAI_API_KEY` empty to fallback to Ollama.
 
 > **Note:** Ollama is suitable for local development or if you have a GPU-enabled server. For production, OpenAI is recommended for reliability and speed.
+
+### Admin-Managed Keys (Settings -> AI Providers)
+
+1. Set `AI_KEYS_ENCRYPTION_SECRET` in the backend environment (required — the page returns
+   a clear error if it's missing rather than silently failing).
+2. Log in as an owner/admin and go to **Settings -> AI Providers**.
+3. Add a key (OpenAI, Kimi, Ollama, OpenRouter, or DeepSeek), set its priority, and click
+   **Test** to confirm it works. Full keys are never shown again after saving — only a
+   fingerprint (first 6 + last 4 characters).
+4. The chat assistant and other AI features automatically use these as a fallback if no
+   env-configured provider is set.
+
+### Chat Assistant Data Access
+
+The floating chat assistant (bottom-right, all authenticated pages) has role-scoped tool
+access enforced **server-side** in `server/src/routers/chat.ts`:
+- **owner / admin / accountant / bookkeeper** get read-only tools across invoices,
+  transactions, compliance, headcount, and payroll for their own org only.
+- **employee / viewer** only get tools scoped to their own employee record (their own PTO
+  balance, their own timesheets).
+- There is no free-form SQL execution — every tool is a fixed, parameterized query. The
+  model cannot expand its own access no matter what it's asked.
 
 ---
 

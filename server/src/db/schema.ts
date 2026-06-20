@@ -2028,3 +2028,41 @@ export const shiftSwapsRelations = relations(shiftSwaps, ({ one }) => ({
   approver: one(users, { fields: [shiftSwaps.approvedBy], references: [users.id] }),
 }));
 
+// ============================================================================
+// AI PROVIDER KEYS (admin-managed, encrypted)
+// ============================================================================
+
+export const aiKeyStatusEnum = pgEnum('ai_key_status', [
+  'unknown', 'working', 'failing', 'disabled',
+]);
+
+export const aiProviderKeys = pgTable('ai_provider_keys', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  provider: varchar('provider', { length: 50 }).notNull(), // 'openai' | 'kimi' | 'ollama' | ...
+  label: varchar('label', { length: 255 }).notNull(),
+  baseUrl: varchar('base_url', { length: 500 }), // for OpenAI-compatible providers (Kimi, Ollama, etc.)
+  encryptedKey: text('encrypted_key').notNull(),
+  keyFingerprint: varchar('key_fingerprint', { length: 50 }).notNull(),
+  priority: integer('priority').notNull().default(100),
+  isEnabled: boolean('is_enabled').notNull().default(true),
+  status: aiKeyStatusEnum('status').notNull().default('unknown'),
+  lastTestedAt: timestamp('last_tested_at', { withTimezone: true }),
+  lastSuccessAt: timestamp('last_success_at', { withTimezone: true }),
+  lastFailureAt: timestamp('last_failure_at', { withTimezone: true }),
+  lastError: text('last_error'),
+  usageCount: integer('usage_count').notNull().default(0),
+  failureCount: integer('failure_count').notNull().default(0),
+  createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('idx_ai_keys_org').on(table.orgId),
+  index('idx_ai_keys_enabled_priority').on(table.isEnabled, table.priority),
+]);
+
+export const aiProviderKeysRelations = relations(aiProviderKeys, ({ one }) => ({
+  organization: one(organizations, { fields: [aiProviderKeys.orgId], references: [organizations.id] }),
+  creator: one(users, { fields: [aiProviderKeys.createdBy], references: [users.id] }),
+}));
+

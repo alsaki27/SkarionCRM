@@ -49,6 +49,7 @@ import Form1099Detail from './pages/Form1099/Form1099Detail.tsx';
 import LandingPage from './pages/LandingPage.tsx';
 import NotificationList from './pages/Notifications/NotificationList.tsx';
 import ApiKeys from './pages/Settings/ApiKeys.tsx';
+import AiProviders from './pages/Settings/AiProviders.tsx';
 import Webhooks from './pages/Settings/Webhooks.tsx';
 import Integrations from './pages/Settings/Integrations.tsx';
 import TeamMembers from './pages/Settings/TeamMembers.tsx';
@@ -178,6 +179,7 @@ function App() {
         <Route path="/settings/organization" element={<Organization />} />
         <Route path="/settings/users" element={<Users />} />
         <Route path="/settings/api-keys" element={<ApiKeys />} />
+        <Route path="/settings/ai-providers" element={<AiProviders />} />
         <Route path="/settings/webhooks" element={<Webhooks />} />
         <Route path="/settings/integrations" element={<Integrations />} />
         <Route path="/settings/team" element={<TeamMembers />} />

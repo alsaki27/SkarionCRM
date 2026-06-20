@@ -22,6 +22,13 @@
       "when": 1781838648050,
       "tag": "0002_lonely_pride",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781914460668,
+      "tag": "0003_broken_hammerhead",
+      "breakpoints": true
     }
   ]
 }

@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { useUIStore } from '../../store';
+import ChatWidget from '../ChatWidget';
 
 export function AppLayout(): React.ReactElement {
   const { sidebarOpen } = useUIStore();
@@ -35,6 +36,7 @@ export function AppLayout(): React.ReactElement {
           <Outlet />
         </main>
       </div>
+      <ChatWidget />
     </div>
   );
 }

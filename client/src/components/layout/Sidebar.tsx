@@ -37,7 +37,7 @@ interface NavItem {
   label: string;
   icon: React.ReactNode;
   path?: string;
-  subItems?: { label: string; path: string }[];
+  subItems?: { label: string; path: string; roles?: string[] }[];
   roles?: string[];
 }
 
@@ -168,6 +168,7 @@ const navItems: NavItem[] = [
       { label: 'Organization', path: '/settings/organization' },
       { label: 'Users', path: '/settings/users' },
       { label: 'API Keys', path: '/settings/api-keys' },
+      { label: 'AI Providers', path: '/settings/ai-providers', roles: ['owner', 'admin'] },
       { label: 'Webhooks', path: '/settings/webhooks' },
       { label: 'Integrations', path: '/settings/integrations' },
       { label: 'Team Members', path: '/settings/team' },
@@ -254,7 +255,9 @@ export function Sidebar(): React.ReactElement {
               {/* Sub-items */}
               {hasSubItems && isExpanded && (
                 <div className="ml-4 mt-1 space-y-1 border-l-2 border-gray-200 pl-3">
-                  {item.subItems?.map((sub) => (
+                  {item.subItems
+                    ?.filter((sub) => !sub.roles || sub.roles.includes(userRole))
+                    .map((sub) => (
                     <Link
                       key={sub.path}
                       to={sub.path}
@@ -283,7 +286,7 @@ export function Sidebar(): React.ReactElement {
           </div>
           <div className="flex-1 min-w-0">
             <p className="truncate text-sm font-medium text-gray-900">
-              {user?.name ?? user?.email ?? 'User'}
+              {user?.fullName ?? user?.email ?? 'User'}
             </p>
             <p className="truncate text-xs text-gray-500">{user?.role ?? 'User'}</p>
           </div>

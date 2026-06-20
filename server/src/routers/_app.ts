@@ -26,6 +26,8 @@ import { importJobRouter } from './importJob.js';
 import { atsRouter } from './ats.js';
 import { timekeepingRouter } from './timekeeping.js';
 import { ptoRouter } from './pto.js';
+import { aiKeysRouter } from './aiKeys.js';
+import { chatRouter } from './chat.js';
 
 export const appRouter = router({
   auth: authRouter,
@@ -55,6 +57,8 @@ export const appRouter = router({
   ats: atsRouter,
   timekeeping: timekeepingRouter,
   pto: ptoRouter,
+  aiKeys: aiKeysRouter,
+  chat: chatRouter,
 });
 
 export type AppRouter = typeof appRouter;
