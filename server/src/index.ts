@@ -5,13 +5,16 @@ import { createContext } from './trpc.js';
 import { appRouter } from './routers/_app.js';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { initializeCronJobs } from './services/cron.js';
+import { parseAllowedOrigins, securityHeaders } from './security/securityHeaders.js';
 
 async function main() {
   const app = express();
   const port = process.env.PORT ? Number(process.env.PORT) : 4000;
   const appUrl = process.env.APP_URL || 'http://localhost:5173';
 
-  app.use(cors({ origin: appUrl, credentials: true }));
+  app.disable('x-powered-by');
+  app.use(securityHeaders());
+  app.use(cors({ origin: parseAllowedOrigins(appUrl), credentials: true }));
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 

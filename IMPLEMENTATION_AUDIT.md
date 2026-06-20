@@ -136,3 +136,21 @@ Picked up **Chunk 6.10 (Backups + DR)** as another parallel-safe lane. This pass
 - `R2_BACKUP_BUCKET`
 - `R2_ACCESS_KEY_ID`
 - `R2_SECRET_ACCESS_KEY`
+
+## Pass 6 (2026-06-20): Chunk 6.11 security headers
+
+Picked up the HTTP-header portion of **Chunk 6.11 (Security hardening)** as another parallel-safe lane.
+
+### Added
+- API security middleware in `server/src/security/securityHeaders.ts`.
+- Production HSTS, API CSP, frame protection, MIME sniffing protection, referrer policy, and restrictive permissions policy.
+- Comma-separated `APP_URL` parsing for exact multi-origin CORS during cutovers/previews.
+- Unit tests for CORS origin parsing and security header behavior.
+- Cloudflare Pages `_headers` file for SPA security headers.
+- Security hardening runbook at `infra/runbooks/security-hardening.md`.
+- Deployment guide notes for multi-origin CORS and header verification.
+
+### Verified
+- `npm exec --workspace=@skarion/server -- vitest run src/security/securityHeaders.test.ts`: 4/4 tests pass.
+- `npm run build`: passes.
+- `npm run lint`: passes with the existing warning backlog.

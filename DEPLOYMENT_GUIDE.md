@@ -253,6 +253,7 @@ Ensure the backend allows requests from your frontend domain. The backend should
   ```
 
 - Verify the backend's CORS middleware is configured to allow this origin.
+- If you need both a custom domain and a Pages preview domain temporarily, `APP_URL` supports a comma-separated list of exact origins. Do not use `*` in production.
 
 ---
 
@@ -311,6 +312,7 @@ For production, consider forwarding logs to a centralized service:
 - [ ] **Environment Variables:** Never commit `.env` or secrets to Git. Use platform secret management (Railway Variables, Fly Secrets, Render Environment Variables).
 - [ ] **Dependency Updates:** Run `npm audit` regularly and update dependencies.
 - [ ] **CORS:** Only allow your frontend domain. Do not use `*` in production.
+- [ ] **Security Headers:** Confirm API headers and Cloudflare Pages headers are present. See `infra/runbooks/security-hardening.md`.
 
 ---
 
