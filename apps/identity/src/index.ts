@@ -226,6 +226,14 @@ app.get('/me', requireAuth, async (c) => {
 // /invitations
 // ─────────────────────────────────────────────────────────
 
+app.get('/invitations', requireAuth, async (c) => {
+  if (!isPlatformAdmin(c.get('apps'))) return c.json({ error: 'Forbidden.' }, 403);
+  const db = getDb(c.env, schema);
+  const status = c.req.query('status') as invitationService.InvitationStatus | undefined;
+  const invitations = await invitationService.listInvitations(db, { status });
+  return c.json({ invitations });
+});
+
 app.post('/invitations', requireAuth, async (c) => {
   const body = await c.req.json<{ email: string; app: AppName; role: string }>();
   if (!body.email || !APP_NAMES.includes(body.app) || !body.role) {
@@ -377,6 +385,51 @@ app.post('/admin/users/:id/disable', requireAuth, async (c) => {
   } catch (err) {
     return errorResponse(c, err);
   }
+});
+
+app.post('/admin/users/:id/enable', requireAuth, async (c) => {
+  if (!isPlatformAdmin(c.get('apps'))) return c.json({ error: 'Forbidden.' }, 403);
+  const db = getDb(c.env, schema);
+  try {
+    await adminService.enableUser(db, {
+      targetUserId: requireParam(c, 'id'),
+      actorUserId: c.get('userId'),
+    });
+    return c.json({ ok: true });
+  } catch (err) {
+    return errorResponse(c, err);
+  }
+});
+
+app.post('/admin/users/:id/force-password-reset', requireAuth, async (c) => {
+  if (!isPlatformAdmin(c.get('apps'))) return c.json({ error: 'Forbidden.' }, 403);
+  const db = getDb(c.env, schema);
+  try {
+    const result = await adminService.forcePasswordReset(db, {
+      targetUserId: requireParam(c, 'id'),
+      actorUserId: c.get('userId'),
+    });
+    const email = await renderPasswordResetEmail({
+      resetUrl: `${c.env.APP_URL}/reset-password?token=${result.token}`,
+    });
+    try {
+      await sendEmail(c.env.RESEND_API_KEY, { to: result.email, ...email });
+    } catch (err) {
+      console.error('Failed to send forced-password-reset email:', err);
+    }
+    return c.json({ ok: true });
+  } catch (err) {
+    return errorResponse(c, err);
+  }
+});
+
+app.get('/admin/audit-log', requireAuth, async (c) => {
+  if (!isPlatformAdmin(c.get('apps'))) return c.json({ error: 'Forbidden.' }, 403);
+  const db = getDb(c.env, schema);
+  const limit = Number(c.req.query('limit')) || undefined;
+  const offset = Number(c.req.query('offset')) || undefined;
+  const entries = await adminService.listAuditLog(db, { limit, offset });
+  return c.json({ entries });
 });
 
 // No /register route - invite-only, per spec.

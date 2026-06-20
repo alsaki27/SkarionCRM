@@ -1,6 +1,6 @@
 // apps/identity/src/services/invitations.ts
 
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { withAudit } from '@skarion/db-kit';
 import * as schema from '../db/schema.js';
 import type { IdentityDb } from '../db/types.js';
@@ -169,4 +169,27 @@ export async function resendInvitation(
   });
 
   return { token, email: invitation.email, app: invitation.app };
+}
+
+export type InvitationStatus = 'pending' | 'accepted' | 'revoked' | 'expired';
+
+function computeStatus(row: {
+  acceptedAt: Date | null;
+  revokedAt: Date | null;
+  expiresAt: Date;
+}): InvitationStatus {
+  if (row.revokedAt) return 'revoked';
+  if (row.acceptedAt) return 'accepted';
+  if (row.expiresAt < new Date()) return 'expired';
+  return 'pending';
+}
+
+export async function listInvitations(db: IdentityDb, params: { status?: InvitationStatus } = {}) {
+  const rows = await db.query.invitations.findMany({
+    orderBy: [desc(schema.invitations.createdAt)],
+    limit: 200,
+  });
+  const withStatus = rows.map((row) => ({ ...row, status: computeStatus(row) }));
+  if (!params.status) return withStatus;
+  return withStatus.filter((row) => row.status === params.status);
 }

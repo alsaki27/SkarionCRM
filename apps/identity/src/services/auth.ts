@@ -18,7 +18,7 @@ import {
 import type { AppMembershipsMap } from '../lib/types.js';
 
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
+export const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export class AuthError extends Error {
   constructor(
