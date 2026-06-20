@@ -299,6 +299,8 @@ For production, consider forwarding logs to a centralized service:
 ### Database Backups
 
 - **Neon:** Automatic daily backups are included. You can also create manual snapshots (branches) instantly.
+- **Neon PITR:** Use `infra/runbooks/neon-pitr-restore.md` for true point-in-time recovery.
+- **R2 logical backups:** `.github/workflows/neon-backup.yml` can run manually or weekly to upload compressed `pg_dump` backups and checksums to Cloudflare R2. See `infra/runbooks/r2-logical-backups.md`.
 - **Self-Hosted Postgres:** Use `pg_dump` or configure automated backups with a tool like `pgbackrest`.
 
 ### Security Checklist

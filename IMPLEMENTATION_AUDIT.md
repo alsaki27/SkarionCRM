@@ -118,3 +118,21 @@ Picked up **Chunk 2.2 (`packages/permissions`)** as a parallel-safe lane while K
 
 ### Still open
 - The package is intentionally not wired into existing routers yet. Integration should happen after the active chunk 3 work settles, so route behavior does not drift underneath Kimi's current implementation.
+
+## Pass 5 (2026-06-20): Chunk 6.10 backup and DR runbooks
+
+Picked up **Chunk 6.10 (Backups + DR)** as another parallel-safe lane. This pass does not touch the active AI/chat files or CRM UI implementation.
+
+### Added
+- GitHub Actions workflow `.github/workflows/neon-backup.yml` for manual and weekly compressed Neon logical backups to Cloudflare R2.
+- Backup workflow checks required secrets before running and avoids printing database URLs, R2 secrets, or dump contents.
+- R2 backup runbook at `infra/runbooks/r2-logical-backups.md`.
+- Neon point-in-time recovery runbook at `infra/runbooks/neon-pitr-restore.md`.
+- Deployment guide now links the PITR and R2 logical backup procedures.
+
+### Required secrets
+- `BACKUP_DATABASE_URL`
+- `R2_ACCOUNT_ID`
+- `R2_BACKUP_BUCKET`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`

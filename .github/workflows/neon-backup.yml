@@ -1,0 +1,94 @@
+name: Neon logical backup to R2
+
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: Optional backup label, for example before-release
+        required: false
+        type: string
+  schedule:
+    # Weekly logical backup on Sunday at 06:00 UTC.
+    - cron: "0 6 * * 0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-logical-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_BACKUP_BUCKET: ${{ secrets.R2_BACKUP_BUCKET }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+    steps:
+      - name: Check required secrets
+        shell: bash
+        run: |
+          missing=0
+          for name in BACKUP_DATABASE_URL R2_ACCOUNT_ID R2_BACKUP_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not configured"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Install backup tools
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client python3-pip
+          python3 -m pip install --user awscli
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Create compressed logical dump
+        id: dump
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p backups
+          stamp="$(date -u +'%Y%m%dT%H%M%SZ')"
+          label="${{ github.event.inputs.label }}"
+          safe_label="$(printf '%s' "$label" | tr -c 'A-Za-z0-9._-' '-' | sed 's/^-*//;s/-*$//')"
+          if [ -n "$safe_label" ]; then
+            filename="skarion-${stamp}-${safe_label}.dump"
+          else
+            filename="skarion-${stamp}.dump"
+          fi
+          path="backups/$filename"
+          pg_dump "$BACKUP_DATABASE_URL" \
+            --format=custom \
+            --compress=9 \
+            --no-owner \
+            --no-privileges \
+            --verbose \
+            --file="$path"
+          sha256sum "$path" > "$path.sha256"
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+          echo "sha_path=$path.sha256" >> "$GITHUB_OUTPUT"
+          echo "object=neon-logical/${filename}" >> "$GITHUB_OUTPUT"
+          echo "sha_object=neon-logical/${filename}.sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Upload backup to Cloudflare R2
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          aws s3 cp "${{ steps.dump.outputs.path }}" "s3://${R2_BACKUP_BUCKET}/${{ steps.dump.outputs.object }}" --endpoint-url "$endpoint"
+          aws s3 cp "${{ steps.dump.outputs.sha_path }}" "s3://${R2_BACKUP_BUCKET}/${{ steps.dump.outputs.sha_object }}" --endpoint-url "$endpoint"
+
+      - name: Print backup object names
+        shell: bash
+        run: |
+          echo "Uploaded backup object: ${{ steps.dump.outputs.object }}"
+          echo "Uploaded checksum object: ${{ steps.dump.outputs.sha_object }}"
+          echo "Secrets and database contents were not printed."
