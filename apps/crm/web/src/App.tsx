@@ -41,7 +41,7 @@ function App() {
   return (
     <div style={{ padding: 40, fontFamily: 'sans-serif' }}>
       <h1>Skarion CRM</h1>
-      <p>Welcome! Dashboard coming soon.</p>
+      <p>Welcome! Dashboard coming soon. (v2)</p>
     </div>
   );
 }
