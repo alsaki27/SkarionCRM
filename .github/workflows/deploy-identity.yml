@@ -34,7 +34,7 @@ jobs:
           version: 9.15.0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - name: Apply identity migrations
@@ -54,7 +54,7 @@ jobs:
           version: 9.15.0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @skarion/identity typecheck
@@ -113,7 +113,7 @@ jobs:
           version: 9.15.0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - name: Build
@@ -122,13 +122,12 @@ jobs:
         env:
           VITE_IDENTITY_API_URL: ${{ vars.IDENTITY_API_URL }}
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
+        uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: skarion-identity-login
-          directory: apps/identity/login/dist
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          workingDirectory: apps/identity
+          command: pages deploy apps/identity/login/dist --project-name=skarion-identity-login
 
   deploy-admin:
     name: Deploy identity admin Pages site
@@ -140,7 +139,7 @@ jobs:
           version: 9.15.0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - name: Build
@@ -149,10 +148,9 @@ jobs:
         env:
           VITE_IDENTITY_API_URL: ${{ vars.IDENTITY_API_URL }}
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
+        uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: skarion-identity-admin
-          directory: apps/identity/admin/dist
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          workingDirectory: apps/identity
+          command: pages deploy apps/identity/admin/dist --project-name=skarion-identity-admin
