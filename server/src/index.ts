@@ -5,6 +5,8 @@ import { createContext } from './trpc.js';
 import { appRouter } from './routers/_app.js';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { initializeCronJobs } from './services/cron.js';
+import { db } from './db/index.js';
+import { buildReadinessReport, readinessStatusCode } from './observability/health.js';
 import { requestLogger } from './observability/requestLogger.js';
 import { createRateLimiter, rateLimitOptionsFromEnv } from './security/rateLimit.js';
 import { parseAllowedOrigins, securityHeaders } from './security/securityHeaders.js';
@@ -25,6 +27,11 @@ async function main() {
   // Health check
   app.get('/health', (_, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  app.get('/ready', async (_, res) => {
+    const report = await buildReadinessReport(db);
+    res.status(readinessStatusCode(report)).json(report);
   });
 
   // tRPC API

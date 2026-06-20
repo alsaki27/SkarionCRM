@@ -265,16 +265,23 @@ Ensure the backend allows requests from your frontend domain. The backend should
 
 ### Health Check Endpoint
 
-The backend exposes a health check at:
+The backend exposes two unauthenticated health endpoints:
 
 ```
 GET /health
 ```
 
-Expected response:
+Use this as a lightweight liveness check. It confirms the Node process is responding and does not touch downstream services.
+
 ```json
-{ "status": "ok" }
+{ "status": "ok", "timestamp": "2026-06-20T00:00:00.000Z" }
 ```
+
+```
+GET /ready
+```
+
+Use this as the deployment/readiness check. It verifies required env presence (`DATABASE_URL`, `JWT_SECRET`) and a simple database round trip. It returns `200` when ready and `503` when degraded. The response only reports presence and generic errors; it never returns secret values or connection strings.
 
 ### Uptime Monitoring
 
@@ -284,7 +291,7 @@ Set up external monitoring to alert you if the service goes down:
 - **Pingdom:** [https://www.pingdom.com](https://www.pingdom.com) — Paid, but more advanced.
 - **Better Uptime:** [https://betteruptime.com](https://betteruptime.com) — Free for basic checks.
 
-Configure the monitor to ping `https://your-backend-url.railway.app/health`.
+Configure uptime monitors to ping `https://your-backend-url.railway.app/health`. Configure deploy gates, load balancers, or smoke tests to use `https://your-backend-url.railway.app/ready`.
 
 ### Logging
 

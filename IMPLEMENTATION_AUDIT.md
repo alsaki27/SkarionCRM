@@ -194,3 +194,18 @@ Picked up CI cleanup as a platform-safe lane.
 ### Rationale
 - This keeps CI aligned with the current Node API + Cloudflare Pages + Neon architecture.
 - It does not start a monolith migration or change runtime feature behavior.
+
+## Pass 10 (2026-06-20): Readiness health checks
+
+Picked up a small platform-readiness lane that stays outside the active chunk 3 feature work.
+
+### Added
+- `/health` remains the lightweight liveness endpoint for uptime monitoring.
+- `/ready` now performs readiness checks for required env presence and database connectivity.
+- Readiness responses return `503` when degraded and do not expose secret values, database URLs, or raw connection errors.
+- Unit tests cover env presence, database success/failure, report composition, and HTTP status mapping.
+- Health check runbook added at `infra/runbooks/health-checks.md`.
+
+### Verified
+- Focused observability tests pass.
+- Build and lint re-verified after the change.
