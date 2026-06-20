@@ -295,6 +295,45 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
   opportunity: one(opportunities, { fields: [tasks.opportunityId], references: [opportunities.id] }),
 }));
 
-export const workflowRulesRelations = relations(workflowRules, () => ({}));
+// ─────────────────────────────────────────────────────────
+// embeddings (for RAG / chatbot)
+// ─────────────────────────────────────────────────────────
+export const embeddings = crmSchema.table(
+  "embeddings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    resourceType: text("resource_type").notNull(), // 'company', 'contact', 'lead', 'opportunity', 'task', 'activity'
+    resourceId: uuid("resource_id").notNull(),
+    content: text("content").notNull(), // the text that was embedded
+    embedding: jsonb("embedding").notNull(), // array of floats stored as JSONB
+    ownerId: uuid("owner_id").notNull(), // for permission filtering
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_embeddings_resource").on(table.resourceType, table.resourceId),
+    index("idx_embeddings_owner").on(table.ownerId),
+    uniqueIndex("idx_embeddings_unique").on(table.resourceType, table.resourceId),
+  ]
+);
 
-export const integrationConfigsRelations = relations(integrationConfigs, () => ({}));
+// ─────────────────────────────────────────────────────────
+// chat_messages (per-user conversation history)
+// ─────────────────────────────────────────────────────────
+export const chatMessages = crmSchema.table(
+  "chat_messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull(),
+    role: text("role").notNull(), // 'user' or 'assistant'
+    content: text("content").notNull(),
+    contextIds: jsonb("context_ids"), // array of {resourceType, resourceId} used as RAG context
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_chat_messages_user").on(table.userId),
+    index("idx_chat_messages_created").on(table.createdAt),
+  ]
+);
+
+export const embeddingsRelations = relations(embeddings, () => ({}));
+export const chatMessagesRelations = relations(chatMessages, () => ({}));

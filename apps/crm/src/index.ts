@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { getDb, withAudit } from "@skarion/db-kit";
 import { requireAuth, requireSuperadmin, type AuthedVariables } from "@skarion/auth-client";
-import { can } from "@skarion/permissions";
+import { can, canList } from "@skarion/permissions";
 import { parseContactsCsv, parseCompaniesCsv, parseLeadsCsv } from "@skarion/importers";
 import * as schema from "./db/schema.js";
 import { eq, and, isNull, like, sql, desc, asc } from "drizzle-orm";
@@ -14,6 +14,9 @@ interface Env {
   APP_URL: string;
   RESEND_API_KEY?: string;
   WORKFLOW_RUNNER_URL?: string;
+  GOOGLE_API_KEY?: string;
+  GOOGLE_EMBEDDING_MODEL?: string;
+  GOOGLE_CHAT_MODEL?: string;
 }
 
 /** Basic email stub — logs what would be sent. Full Resend wiring in a future ticket. */
@@ -1458,6 +1461,134 @@ app.delete("/api/integrations/:id", async (c) => {
 
   await db.delete(schema.integrationConfigs).where(eq(schema.integrationConfigs.id, id));
   return c.json({ success: true });
+});
+
+// ─── CHAT ────────────────────────────────────────────────────────────────
+
+// Cosine similarity between two float arrays (stored as JSONB).
+function cosineSimilarity(a: number[], b: number[]): number {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    const ai = a[i]!;
+    const bi = b[i]!;
+    dot += ai * bi;
+    na += ai * ai;
+    nb += bi * bi;
+  }
+  return dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
+
+// Fetch embedding from Google Gemini. Falls back to null if key is missing.
+async function getEmbedding(text: string, env: Env): Promise<number[] | null> {
+  if (!env.GOOGLE_API_KEY) return null;
+  const model = env.GOOGLE_EMBEDDING_MODEL || 'embedding-001';
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent?key=${env.GOOGLE_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: `models/${model}`,
+        content: { parts: [{ text }] },
+      }),
+    });
+    if (!res.ok) { console.error('Google embedding error:', await res.text()); return null; }
+    const data = (await res.json()) as { embedding?: { values?: number[] } };
+    return data.embedding?.values ?? null;
+  } catch (err) {
+    console.error('Embedding fetch failed:', err);
+    return null;
+  }
+}
+
+// Google Gemini chat completion. Falls back to null if key is missing.
+async function chatCompletion(prompt: string, env: Env): Promise<string | null> {
+  if (!env.GOOGLE_API_KEY) return null;
+  const model = env.GOOGLE_CHAT_MODEL || 'gemini-1.5-flash';
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GOOGLE_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          { role: 'user', parts: [{ text: `You are a helpful CRM assistant. Answer based on the provided context. If the answer is not in the context, say so.\n\n${prompt}` }] },
+        ],
+        generationConfig: { temperature: 0.3 },
+      }),
+    });
+    if (!res.ok) { console.error('Google chat error:', await res.text()); return null; }
+    const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+    return data.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+  } catch (err) {
+    console.error('Chat completion failed:', err);
+    return null;
+  }
+}
+
+app.get('/api/chat/history', async (c) => {
+  const db = getDb(c.env, schema) as CrmDb;
+  const userId = c.get('userId');
+  const rows = await db.select().from(schema.chatMessages)
+    .where(eq(schema.chatMessages.userId, userId))
+    .orderBy(asc(schema.chatMessages.createdAt))
+    .limit(100);
+  return c.json({ messages: rows });
+});
+
+app.post('/api/chat', async (c) => {
+  const db = getDb(c.env, schema) as CrmDb;
+  const userId = c.get('userId');
+  const isSuperadmin = c.get('isSuperadmin') ?? false;
+  const role = c.get('apps')?.crm ?? 'member';
+
+  const body = await c.req.json();
+  const message = body.message?.trim();
+  if (!message) return c.json({ error: 'Message is required.' }, 400);
+
+  // 1. Embed the user's question
+  const queryEmbedding = await getEmbedding(message, c.env);
+
+  // 2. Retrieve all candidate embeddings
+  const allEmbeddings = await db.select().from(schema.embeddings);
+
+  // 3. Score by similarity and filter by permission using canList()
+  const scored = allEmbeddings
+    .map((e) => ({
+      ...e,
+      score: queryEmbedding && Array.isArray(e.embedding)
+        ? cosineSimilarity(queryEmbedding, e.embedding as number[])
+        : 0,
+    }))
+    .filter((e) => canList(isSuperadmin, role, { userId: userId, isSuperadmin }, e.ownerId))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+
+  // 4. Build context prompt
+  const context = scored.map((e, i) => `\n[${i + 1}] ${e.resourceType} ${e.resourceId}:\n${e.content}`).join('');
+  const prompt = `Context:${context}\n\nUser question: ${message}`;
+
+  // 5. Persist user message
+  await db.insert(schema.chatMessages).values({
+    userId,
+    role: 'user',
+    content: message,
+  });
+
+  // 6. Call LLM
+  let answer = await chatCompletion(prompt, c.env);
+  if (!answer) {
+    answer = '[AI assistant is not configured. Add GOOGLE_API_KEY to enable chat.]';
+  }
+
+  // 7. Persist assistant response
+  const contextIds = scored.map((e) => ({ resourceType: e.resourceType, resourceId: e.resourceId }));
+  const [assistantMessage] = await db.insert(schema.chatMessages).values({
+    userId,
+    role: 'assistant',
+    content: answer,
+    contextIds,
+  }).returning();
+
+  return c.json({ answer, context: scored, message: assistantMessage });
 });
 
 export default app;
