@@ -116,18 +116,16 @@ jobs:
           node-version: 24
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - name: Build
+      - name: Build login
         working-directory: apps/identity/login
         run: pnpm build
         env:
           VITE_IDENTITY_API_URL: ${{ vars.IDENTITY_API_URL }}
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/identity/login
-          command: pages deploy dist --project-name=skarion-identity-login
+        run: npx wrangler pages deploy apps/identity/login/dist --project-name=skarion-identity-login --branch=main
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   deploy-admin:
     name: Deploy identity admin Pages site
@@ -142,15 +140,13 @@ jobs:
           node-version: 24
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - name: Build
+      - name: Build admin
         working-directory: apps/identity/admin
         run: pnpm build
         env:
           VITE_IDENTITY_API_URL: ${{ vars.IDENTITY_API_URL }}
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/identity/admin
-          command: pages deploy dist --project-name=skarion-identity-admin
+        run: npx wrangler pages deploy apps/identity/admin/dist --project-name=skarion-identity-admin --branch=main
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
