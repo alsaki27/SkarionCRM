@@ -169,3 +169,15 @@ Continued **Chunk 6.11 (Security hardening)** with a Node API rate limiting foun
 
 ### Operational note
 - This is suitable as a first production guard on a single Node API instance. Multi-instance deployments should move the counter to a shared store or use platform-native Cloudflare/host rate limits.
+
+## Pass 8 (2026-06-20): Chunk 6.9 request observability
+
+Picked up the request logging/request ID portion of **Chunk 6.9 (Observability)**.
+
+### Added
+- `server/src/observability/requestLogger.ts` middleware.
+- `X-Request-ID` response header with incoming request ID propagation.
+- JSON request completion logs to stdout with request ID, method, path, status, duration, user agent, and client IP.
+- `REQUEST_LOGGING_ENABLED=false` escape hatch for local noise reduction.
+- Unit tests in `server/src/observability/requestLogger.test.ts`.
+- Deployment/runbook docs for request ID troubleshooting.

@@ -86,6 +86,7 @@ AI_KEYS_ENCRYPTION_SECRET=
 RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=300
 SENSITIVE_RATE_LIMIT_MAX=30
+REQUEST_LOGGING_ENABLED=true
 ```
 
 ### Option A: Railway (Recommended for Beginners)
@@ -287,9 +288,9 @@ Configure the monitor to ping `https://your-backend-url.railway.app/health`.
 
 ### Logging
 
-The backend already uses **Winston** for structured logging. Logs are written to:
-- Console (standard output)
-- Optionally, files in `server/logs/`
+The backend emits JSON request-completion logs to stdout with `requestId`, method, path,
+status, duration, user agent, and client IP. It also returns `X-Request-ID` on responses
+and honors incoming `X-Request-ID` headers from upstream proxies.
 
 For production, consider forwarding logs to a centralized service:
 - **Railway:** Logs are available in the dashboard automatically.

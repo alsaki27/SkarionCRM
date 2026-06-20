@@ -70,3 +70,9 @@ curl -I https://crm.example.com/
 ```
 
 Confirm security headers are present and CORS only allows the configured frontend origin.
+
+## Request IDs and Logs
+
+The API returns an `X-Request-ID` header and logs each completed request as one JSON line to stdout. Set `REQUEST_LOGGING_ENABLED=false` only for local noise reduction.
+
+When investigating an incident, ask for the `X-Request-ID` from the browser/network trace and search backend logs for that exact ID.

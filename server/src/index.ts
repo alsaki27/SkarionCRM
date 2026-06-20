@@ -5,6 +5,7 @@ import { createContext } from './trpc.js';
 import { appRouter } from './routers/_app.js';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { initializeCronJobs } from './services/cron.js';
+import { requestLogger } from './observability/requestLogger.js';
 import { createRateLimiter, rateLimitOptionsFromEnv } from './security/rateLimit.js';
 import { parseAllowedOrigins, securityHeaders } from './security/securityHeaders.js';
 
@@ -15,6 +16,7 @@ async function main() {
 
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
+  app.use(requestLogger());
   app.use(securityHeaders());
   app.use(cors({ origin: parseAllowedOrigins(appUrl), credentials: true }));
   app.use(express.json({ limit: '10mb' }));
