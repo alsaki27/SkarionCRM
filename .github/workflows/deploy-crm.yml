@@ -54,23 +54,5 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
-  deploy-pages:
-    name: Deploy CRM Pages
-    needs: deploy-worker
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: cd apps/crm/web && pnpm exec vite build
-        env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-      - uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy apps/crm/web/dist --project-name=skarion-crm
+  # Pages is deployed via Cloudflare's GitHub integration (auto-build on push).
+  # Project: skarion-crm | Branch: cloudflare-platform-rewrite | Root: apps/crm/web
