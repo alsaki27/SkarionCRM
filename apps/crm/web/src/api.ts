@@ -14,6 +14,10 @@
 // place (dashboard env var or local .env) without a grep-and-replace.
 export const CRM_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8788';
 export const IDENTITY_API_URL = import.meta.env.VITE_IDENTITY_API_URL || 'https://skarion-identity.alsaki1999.workers.dev';
+// The login page is a separate Pages site (not the Worker API). Separate env var so
+// the redirect goes to the right place while API calls still hit the worker.
+export const IDENTITY_LOGIN_URL = import.meta.env.VITE_IDENTITY_LOGIN_URL || IDENTITY_API_URL;
+
 
 let accessToken: string | null = null;
 
@@ -72,7 +76,7 @@ export async function bootstrapAuth(): Promise<{ id: string; email: string; name
 /** Redirects to the public login app, returning here after a successful login. */
 export function redirectToLogin(): void {
   const returnTo = encodeURIComponent(window.location.href);
-  window.location.href = `${IDENTITY_API_URL}/?return_to=${returnTo}`;
+  window.location.href = `${IDENTITY_LOGIN_URL}/?return_to=${returnTo}`;
 }
 
 export async function crmFetch<T>(path: string, init: RequestInit = {}): Promise<T> {

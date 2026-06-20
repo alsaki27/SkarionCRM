@@ -25,6 +25,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
   setLoading: (isLoading) => set({ isLoading }),
   logout: () => {
     set({ user: null, isLoading: false });
-    window.location.href = 'https://skarion-identity.alsaki1999.workers.dev/logout';
+    const loginUrl = import.meta.env.VITE_IDENTITY_LOGIN_URL || import.meta.env.VITE_IDENTITY_API_URL || 'https://skarion-identity.alsaki1999.workers.dev';
+    window.location.href = `${loginUrl}/logout`;
   },
 }));
