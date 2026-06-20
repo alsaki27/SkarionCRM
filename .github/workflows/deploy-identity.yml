@@ -122,7 +122,8 @@ jobs:
         env:
           VITE_IDENTITY_API_URL: ${{ vars.IDENTITY_API_URL }}
       - name: Deploy to Cloudflare Pages
-        run: pnpm exec wrangler pages deploy apps/identity/login/dist --project-name=skarion-identity-login
+        working-directory: apps/identity/login
+        run: pnpm exec wrangler pages deploy dist --project-name=skarion-identity-login
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -146,7 +147,8 @@ jobs:
         env:
           VITE_IDENTITY_API_URL: ${{ vars.IDENTITY_API_URL }}
       - name: Deploy to Cloudflare Pages
-        run: pnpm exec wrangler pages deploy apps/identity/admin/dist --project-name=skarion-identity-admin
+        working-directory: apps/identity/admin
+        run: pnpm exec wrangler pages deploy dist --project-name=skarion-identity-admin
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
