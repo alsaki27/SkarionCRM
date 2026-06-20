@@ -1,0 +1,17 @@
+{
+  "name": "@skarion/accounting",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "build": "echo \"(stub) no build yet for @skarion/accounting\"",
+    "dev": "echo \"(stub) no dev yet for @skarion/accounting\"",
+    "test": "echo \"(stub) no tests yet for @skarion/accounting\"",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings=0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@skarion/ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "build": "echo \"(stub) no build yet for @skarion/ui\"",
+    "dev": "echo \"(stub) no dev yet for @skarion/ui\"",
+    "test": "echo \"(stub) no tests yet for @skarion/ui\"",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings=0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

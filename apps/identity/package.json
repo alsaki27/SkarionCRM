@@ -1,0 +1,17 @@
+{
+  "name": "@skarion/identity",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "build": "echo \"(stub) no build yet for @skarion/identity\"",
+    "dev": "echo \"(stub) no dev yet for @skarion/identity\"",
+    "test": "echo \"(stub) no tests yet for @skarion/identity\"",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings=0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@skarion/crm",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "build": "echo \"(stub) no build yet for @skarion/crm\"",
+    "dev": "echo \"(stub) no dev yet for @skarion/crm\"",
+    "test": "echo \"(stub) no tests yet for @skarion/crm\"",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings=0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}
