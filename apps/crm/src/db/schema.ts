@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { sql, relations } from "drizzle-orm";
 import {
   pgSchema, text, timestamp, uuid, index, uniqueIndex, jsonb, inet,
   integer, decimal, date,
@@ -57,7 +57,7 @@ export const companies = crmSchema.table(
     index("idx_companies_name").on(table.name),
     index("idx_companies_owner").on(table.ownerId),
     index("idx_companies_industry").on(table.industry),
-    uniqueIndex("idx_companies_domain_lower").on(table.domain),
+    uniqueIndex("idx_companies_domain_lower").on(sql`lower(${table.domain})`),
   ]
 );
 
@@ -78,7 +78,7 @@ export const contacts = crmSchema.table(
   (table) => [
     index("idx_contacts_company").on(table.companyId),
     index("idx_contacts_owner").on(table.ownerId),
-    uniqueIndex("idx_contacts_email_lower").on(table.email),
+    uniqueIndex("idx_contacts_email_lower").on(sql`lower(${table.email})`),
     index("idx_contacts_name").on(table.lastName, table.firstName),
   ]
 );
@@ -107,7 +107,7 @@ export const leads = crmSchema.table(
     index("idx_leads_status").on(table.status),
     index("idx_leads_source").on(table.source),
     index("idx_leads_owner").on(table.ownerId),
-    index("idx_leads_email_lower").on(table.email),
+    index("idx_leads_email_lower").on(sql`lower(${table.email})`),
     index("idx_leads_created").on(table.createdAt),
   ]
 );
