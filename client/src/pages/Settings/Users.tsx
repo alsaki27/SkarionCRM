@@ -10,7 +10,7 @@ import { Table } from '../../components/ui/Table';
 import { addToast } from '../../components/ui/Toast';
 import {
   Plus,
-  Users,
+  Users as UsersIcon,
   UserCheck,
   UserX,
   Mail,
@@ -132,7 +132,7 @@ export default function Users(): React.ReactElement {
           </div>
         ) : users.length === 0 ? (
           <EmptyState
-            icon={Users}
+            icon={UsersIcon}
             title="No users found"
             description={searchQuery ? 'Try a different search.' : 'Invite your first team member.'}
             actionLabel={searchQuery ? undefined : 'Invite User'}
