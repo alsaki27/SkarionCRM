@@ -20,7 +20,7 @@ name: Deploy Identity (Cloudflare)
 
 on:
   push:
-    branches: [main]
+    branches: [main, cloudflare-platform-rewrite]
   workflow_dispatch:
 
 jobs:
@@ -126,8 +126,8 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/identity
-          command: pages deploy apps/identity/login/dist --project-name=skarion-identity-login
+          workingDirectory: apps/identity/login
+          command: pages deploy dist --project-name=skarion-identity-login
 
   deploy-admin:
     name: Deploy identity admin Pages site
@@ -152,5 +152,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/identity
-          command: pages deploy apps/identity/admin/dist --project-name=skarion-identity-admin
+          workingDirectory: apps/identity/admin
+          command: pages deploy dist --project-name=skarion-identity-admin

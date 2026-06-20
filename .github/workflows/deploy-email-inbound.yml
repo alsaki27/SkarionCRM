@@ -2,7 +2,7 @@ name: Deploy Email Inbound Worker
 
 on:
   push:
-    branches: [main]
+    branches: [main, cloudflare-platform-rewrite]
     paths:
       - 'apps/workers/email-inbound/**'
       - 'packages/db-kit/**'

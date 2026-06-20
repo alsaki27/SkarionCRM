@@ -2,7 +2,7 @@ name: Deploy Embeddings Builder
 
 on:
   push:
-    branches: [main]
+    branches: [main, cloudflare-platform-rewrite]
     paths:
       - 'apps/workers/embeddings-builder/**'
       - 'packages/db-kit/**'

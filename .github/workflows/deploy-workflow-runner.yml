@@ -2,7 +2,7 @@ name: Deploy Workflow Runner
 
 on:
   push:
-    branches: [main]
+    branches: [main, cloudflare-platform-rewrite]
     paths:
       - 'apps/workers/workflow-runner/**'
       - 'packages/db-kit/**'
