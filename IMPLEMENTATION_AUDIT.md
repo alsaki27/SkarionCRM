@@ -203,6 +203,7 @@ Picked up a small platform-readiness lane that stays outside the active chunk 3 
 - `/health` remains the lightweight liveness endpoint for uptime monitoring.
 - `/ready` now performs readiness checks for required env presence and database connectivity.
 - Readiness responses return `503` when degraded and do not expose secret values, database URLs, or raw connection errors.
+- Railway, Render, Docker, and Docker Compose are aligned to use `/ready` for deployment/container health checks.
 - Unit tests cover env presence, database success/failure, report composition, and HTTP status mapping.
 - Health check runbook added at `infra/runbooks/health-checks.md`.
 

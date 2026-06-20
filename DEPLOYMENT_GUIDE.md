@@ -98,6 +98,7 @@ REQUEST_LOGGING_ENABLED=true
 5. In the Railway dashboard, go to **Variables** and add all required env vars.
 6. Add a **Neon** database service from the Railway marketplace, or paste your `DATABASE_URL` manually.
 7. Railway will automatically build and deploy using the `railway.json` configuration.
+   - Railway uses `/ready` for deployment health checks, so `DATABASE_URL` and `JWT_SECRET` must be set before the service is considered ready.
 
 ### Option B: Render
 
@@ -110,6 +111,7 @@ REQUEST_LOGGING_ENABLED=true
 5. In **Environment Variables**, add all required env vars.
 6. Render will detect the `render.yaml` in the repo if you choose **Blueprints** during creation.
 7. The database will be provisioned automatically if you use the Blueprint.
+8. Set `JWT_SECRET` in Render after Blueprint creation; `/ready` will stay degraded until it is present.
 
 ### Option C: Fly.io
 
@@ -133,6 +135,7 @@ REQUEST_LOGGING_ENABLED=true
    ```
 4. The app will be available on `http://localhost:4000` (or your VPS IP).
 5. The Postgres container will persist data in the `postgres_data` Docker volume.
+6. Docker health checks use `/ready`, so the app container reports healthy only after env and database checks pass.
 
 > **Note:** For production Docker deployments, replace the `db` service in `docker-compose.yml` with a managed database (Neon, AWS RDS, etc.) for reliability.
 

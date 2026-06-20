@@ -27,6 +27,8 @@ Expected status: `200` when ready, `503` when degraded.
 
 The response reports only env presence and generic database failure text. It must not expose database URLs, passwords, JWT secrets, or provider keys.
 
+Railway, Render, Docker, and Docker Compose should use `/ready` for platform health checks. External uptime monitors can keep using `/health` to avoid alerting on short database maintenance windows when the process is still available.
+
 ## Troubleshooting
 
 - Missing `DATABASE_URL`: set the Neon/Postgres connection string on the backend host.

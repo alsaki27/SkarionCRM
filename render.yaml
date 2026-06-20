@@ -13,7 +13,9 @@ services:
         fromDatabase:
           name: skarion-db
           property: connectionString
-    healthCheckPath: /health
+      - key: JWT_SECRET
+        sync: false
+    healthCheckPath: /ready
 
 databases:
   - name: skarion-db
