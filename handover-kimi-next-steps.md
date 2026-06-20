@@ -116,8 +116,7 @@ a real database check — a throwaway script (use
 host — see `packages/db-kit/README.md`) that creates a record, lists it
 back, edits it, soft-deletes it, and asserts an `audit_log` row exists
 for each mutation. Delete the script before committing. `pnpm typecheck`
-
-- `pnpm lint` clean across the whole repo, not just `apps/crm`.
+and `pnpm lint` clean across the whole repo, not just `apps/crm`.
 
 ## Step 3 — One thing that needs Abdullah, not you
 
