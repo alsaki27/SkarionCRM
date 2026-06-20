@@ -95,3 +95,26 @@ Result: **28/28 tests passing, 6/6 files green** (previously: tests couldn't eve
 **Stress test**: ran `server/src/test/stress-test.ts` against the real DB — 100 contacts, 100 transactions, 50 invoices (with lines), 50 employees, 50 concurrent parallel reads, plus AI fallback endpoints: **0 failures**, ~1.2s total. Extended the script with a new section exercising last session's `aiKeys` (create/list/update/disable) and `chat.sendMessage` routers end-to-end against the real DB — also 0 failures, including confirming `chat.sendMessage` fails cleanly (not a crash) when no AI provider is configured.
 
 Build and lint re-verified clean after all fixes (0 lint errors, build passes).
+
+## Pass 4 (2026-06-20): Chunk 2.2 permissions package
+
+Picked up **Chunk 2.2 (`packages/permissions`)** as a parallel-safe lane while Kimi works on chunk 3. This pass does not modify the current AI/chat/provider implementation or CRM UI files.
+
+### Added
+- New `@skarion/permissions` workspace package with a pure-functional CRM permission policy.
+- Explicit CRM action vocabulary covering record actions, settings actions, user administration actions, and AI actions.
+- `can(user, action, resource?)` decision helper returning `boolean | "needs_owner_check" | "needs_team_check"` so routers can hydrate owned/team-scoped records before final authorization.
+- Role matrix:
+  - `outreach`: create base records, read/update owned or shared records, create/update own tasks, draft email from owned/shared work, use non-bulk AI.
+  - `manager`: team-scoped record actions, CRM settings configuration, outreach-only invites/role changes, bulk AI.
+  - `superadmin`: all CRM actions.
+- Vitest coverage for the matrix, superadmin all-actions coverage, manager record-action coverage, ownership/team checks, AI permissions, and manager user-admin limits.
+
+### Verified
+- `npm run typecheck --workspace=@skarion/permissions`: passes.
+- `npm run test --workspace=@skarion/permissions`: 9/9 tests pass.
+- `npm run build`: passes.
+- `npm run lint`: passes with the existing warning backlog (165 warnings, 0 errors).
+
+### Still open
+- The package is intentionally not wired into existing routers yet. Integration should happen after the active chunk 3 work settles, so route behavior does not drift underneath Kimi's current implementation.
