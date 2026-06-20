@@ -5,6 +5,7 @@ import { createContext } from './trpc.js';
 import { appRouter } from './routers/_app.js';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { initializeCronJobs } from './services/cron.js';
+import { createRateLimiter, rateLimitOptionsFromEnv } from './security/rateLimit.js';
 import { parseAllowedOrigins, securityHeaders } from './security/securityHeaders.js';
 
 async function main() {
@@ -13,6 +14,7 @@ async function main() {
   const appUrl = process.env.APP_URL || 'http://localhost:5173';
 
   app.disable('x-powered-by');
+  app.set('trust proxy', 1);
   app.use(securityHeaders());
   app.use(cors({ origin: parseAllowedOrigins(appUrl), credentials: true }));
   app.use(express.json({ limit: '10mb' }));
@@ -24,7 +26,7 @@ async function main() {
   });
 
   // tRPC API
-  app.use('/trpc', createExpressMiddleware({
+  app.use('/trpc', createRateLimiter(rateLimitOptionsFromEnv()), createExpressMiddleware({
     router: appRouter,
     createContext,
   }));

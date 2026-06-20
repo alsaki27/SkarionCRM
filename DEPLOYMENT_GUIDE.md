@@ -83,6 +83,9 @@ FROM_EMAIL=noreply@skarion.com
 # Generate with: openssl rand -base64 32. Without it, admins can still configure AI
 # via the OPENAI_API_KEY/KIMI_API_KEY/OLLAMA_URL env vars above, just not from the UI.
 AI_KEYS_ENCRYPTION_SECRET=
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX=300
+SENSITIVE_RATE_LIMIT_MAX=30
 ```
 
 ### Option A: Railway (Recommended for Beginners)
@@ -313,6 +316,7 @@ For production, consider forwarding logs to a centralized service:
 - [ ] **Dependency Updates:** Run `npm audit` regularly and update dependencies.
 - [ ] **CORS:** Only allow your frontend domain. Do not use `*` in production.
 - [ ] **Security Headers:** Confirm API headers and Cloudflare Pages headers are present. See `infra/runbooks/security-hardening.md`.
+- [ ] **Rate Limiting:** Tune `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX`, and `SENSITIVE_RATE_LIMIT_MAX` for production traffic. Sensitive tRPC procedures have a lower limit.
 
 ---
 

@@ -37,6 +37,22 @@ Recommended dashboard settings:
 4. Require HTTPS and automatic HTTPS rewrites.
 5. Review Pages preview deployments before exposing them to customers.
 
+## API Rate Limiting
+
+The Node API applies an in-memory per-client/per-procedure limiter before `/trpc`.
+
+Environment variables:
+
+```env
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX=300
+SENSITIVE_RATE_LIMIT_MAX=30
+```
+
+Sensitive procedures currently include login/register/password reset, chat messages, and AI provider key tests. The limiter honors `CF-Connecting-IP` and `X-Forwarded-For`, and the Express app trusts one proxy hop for Cloudflare/platform deployments.
+
+For multi-instance API deployments, this in-memory limiter should be backed by a shared store or replaced with platform-native Cloudflare/host rate limits.
+
 ## Secrets
 
 - Keep `.env`, `.env.local`, database URLs, AI keys, JWT secrets, and R2 keys out of git.

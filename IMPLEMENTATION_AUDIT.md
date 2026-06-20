@@ -154,3 +154,18 @@ Picked up the HTTP-header portion of **Chunk 6.11 (Security hardening)** as anot
 - `npm exec --workspace=@skarion/server -- vitest run src/security/securityHeaders.test.ts`: 4/4 tests pass.
 - `npm run build`: passes.
 - `npm run lint`: passes with the existing warning backlog.
+
+## Pass 7 (2026-06-20): Chunk 6.11 rate limiting foundation
+
+Continued **Chunk 6.11 (Security hardening)** with a Node API rate limiting foundation. This is intentionally Express middleware, not a monolith rewrite or Cloudflare Workers migration.
+
+### Added
+- `server/src/security/rateLimit.ts` with per-client/per-tRPC-procedure in-memory rate limiting.
+- Lower default limit for sensitive procedures: auth login/register/password reset, chat send, and AI provider key tests.
+- Rate limit headers and `Retry-After` responses for blocked calls.
+- Cloudflare-aware client IP handling via `CF-Connecting-IP` / forwarded headers and `trust proxy`.
+- Unit tests in `server/src/security/rateLimit.test.ts`.
+- Env docs for `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX`, and `SENSITIVE_RATE_LIMIT_MAX`.
+
+### Operational note
+- This is suitable as a first production guard on a single Node API instance. Multi-instance deployments should move the counter to a shared store or use platform-native Cloudflare/host rate limits.
