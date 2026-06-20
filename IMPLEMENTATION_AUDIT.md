@@ -181,3 +181,16 @@ Picked up the request logging/request ID portion of **Chunk 6.9 (Observability)*
 - `REQUEST_LOGGING_ENABLED=false` escape hatch for local noise reduction.
 - Unit tests in `server/src/observability/requestLogger.test.ts`.
 - Deployment/runbook docs for request ID troubleshooting.
+
+## Pass 9 (2026-06-20): CI truthfulness and Postgres-backed tests
+
+Picked up CI cleanup as a platform-safe lane.
+
+### Changed
+- `.github/workflows/ci.yml` now starts a PostgreSQL 17 service for the server test suite.
+- CI runs `npm ci`, lint, focused permissions typecheck/tests, migrations, server tests, and build.
+- Removed the stale root `npm run typecheck` call from CI because the root package has no `typecheck` script and whole-repo type drift is still tracked separately.
+
+### Rationale
+- This keeps CI aligned with the current Node API + Cloudflare Pages + Neon architecture.
+- It does not start a monolith migration or change runtime feature behavior.
