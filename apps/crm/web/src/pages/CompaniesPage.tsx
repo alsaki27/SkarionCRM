@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCompanies, useDeleteEntity } from '../hooks/use-api.js';
-import { Building2, Plus, Search, Trash2, Pencil } from 'lucide-react';
+import { Building2, Plus, Search, Trash2, Pencil, Upload } from 'lucide-react';
 import CompanyForm from '../components/forms/CompanyForm.js';
+import ImportModal from '../components/ImportModal.js';
 import type { Company } from '../api.js';
 
 export default function CompaniesPage() {
@@ -11,6 +12,7 @@ export default function CompaniesPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editCompany, setEditCompany] = useState<Company | null>(null);
 
   const openCreate = () => { setEditCompany(null); setModalOpen(true); };
@@ -34,9 +36,14 @@ export default function CompaniesPage() {
           <h1 className="text-xl font-semibold">Companies</h1>
           <span className="text-sm text-slate-500">({filtered.length})</span>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">
-          <Plus size={16} /> Add Company
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setImportOpen(true)} className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-md text-sm hover:bg-slate-50 text-slate-600">
+            <Upload size={16} /> Import
+          </button>
+          <button onClick={openCreate} className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">
+            <Plus size={16} /> Add Company
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-md px-3 py-2">
@@ -93,6 +100,15 @@ export default function CompaniesPage() {
       </div>
 
       <CompanyForm open={modalOpen} onClose={closeModal} company={editCompany} />
+      <ImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        type="companies"
+        title="Companies"
+        sampleCsv={`name,domain,industry,size
+Acme Inc,acme.com,Technology,11-50
+Globex Corp,globex.org,Manufacturing,201-500`}
+      />
     </div>
   );
 }
