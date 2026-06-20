@@ -101,7 +101,7 @@ describe('Auth Router', () => {
   describe('protected endpoints', () => {
     it('should reject unauthenticated requests to protected endpoints', async () => {
       const caller = appRouter.createCaller(createTestContext());
-      await expect(caller.auth.me()).rejects.toThrow('UNAUTHORIZED');
+      await expect(caller.auth.me()).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     });
   });
 });

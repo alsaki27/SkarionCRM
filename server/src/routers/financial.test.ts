@@ -44,7 +44,7 @@ describe('Financial Router', () => {
           name: 'Duplicate Account',
           accountType: 'liability',
         })
-      ).rejects.toThrow('CONFLICT');
+      ).rejects.toMatchObject({ code: 'CONFLICT' });
     });
   });
 

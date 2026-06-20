@@ -77,5 +77,21 @@ No Cloudflare or Neon credentials exist in this repo/environment, so no live dep
 
 ### Still open (pre-existing, not addressed this pass — same as before)
 1. Server/client typecheck cleanup (Drizzle enum/Date mismatches, tRPC `AppRouter` collision, import-extension convention).
-2. Real test database / `.env.test` setup so `vitest run` can execute past the connection guard.
-3. Route-by-route runtime smoke test against a real Postgres instance (build uses `--noCheck`, so type errors could still hide runtime bugs in older routers).
+2. Route-by-route runtime smoke test against a real Postgres instance beyond what's covered below (build uses `--noCheck`, so type errors could still hide runtime bugs in older routers).
+
+## Pass 3 (2026-06-20): real-database migration run + full test suite + stress test
+
+Installed a dedicated local PostgreSQL 17 (port 5433, separate from any other local instance) specifically to validate against a real database instead of static review.
+
+**Migrations**: `npm run db:migrate` applied cleanly against a fresh `skarion_test` database — confirmed `ai_provider_keys` table and the `employees.user_id` drift-fix column both land correctly. No issues.
+
+**Test suite**: previously blocked entirely by `DATABASE_URL` (see Pass 1, item 3) — now resolved by the dedicated test DB. First real run surfaced 5 genuine bugs, all fixed:
+- **Real production bug**: `contact.getById` crashed on every call. `contactsRelations` declared `documents: many(documents)` and `tasks: many(tasks)`, but both tables relate to `contacts` via a polymorphic `entityType`/`entityId` pair, not a real FK — Drizzle can't infer that join. Fixed by removing both relation declarations and fetching documents/tasks separately by `entityType = 'contact'` in `routers/contact.ts`, preserving the same response shape.
+- **Test flakiness**: `test/factory.ts`'s `createTestOrg`/`createTestUser` used only `Date.now()` for uniqueness, which collided under vitest's parallel test-file execution (two workers landing on the same millisecond), tripping unique constraints. Fixed by appending a `crypto.randomUUID()` suffix.
+- **3 test-assertion bugs** (auth, employee, financial routers): each test asserted `.rejects.toThrow('CONFLICT'|'UNAUTHORIZED')`, which checks the error's `.message` string — but the routers correctly throw `TRPCError` with that value in `.code`, not in the message text. The implementations were already correct; fixed the assertions to check `.code` via `toMatchObject`.
+
+Result: **28/28 tests passing, 6/6 files green** (previously: tests couldn't even start).
+
+**Stress test**: ran `server/src/test/stress-test.ts` against the real DB — 100 contacts, 100 transactions, 50 invoices (with lines), 50 employees, 50 concurrent parallel reads, plus AI fallback endpoints: **0 failures**, ~1.2s total. Extended the script with a new section exercising last session's `aiKeys` (create/list/update/disable) and `chat.sendMessage` routers end-to-end against the real DB — also 0 failures, including confirming `chat.sendMessage` fails cleanly (not a crash) when no AI provider is configured.
+
+Build and lint re-verified clean after all fixes (0 lint errors, build passes).

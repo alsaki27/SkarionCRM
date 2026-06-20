@@ -51,7 +51,7 @@ describe('Employee Router', () => {
           lastName: 'Employee',
           hireDate: '2024-01-01',
         })
-      ).rejects.toThrow('CONFLICT');
+      ).rejects.toMatchObject({ code: 'CONFLICT' });
     });
   });
 

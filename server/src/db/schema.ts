@@ -231,9 +231,11 @@ export const contactsRelations = relations(contacts, ({ one, many }) => ({
   organization: one(organizations, { fields: [contacts.orgId], references: [organizations.id] }),
   assignee: one(users, { fields: [contacts.assignedTo], references: [users.id] }),
   communications: many(contactCommunications),
-  documents: many(documents),
+  // Note: documents and tasks relate to contacts via a polymorphic
+  // entityType/entityId pair, not a real FK column, so Drizzle's relational
+  // query builder can't infer those joins. Fetch them separately (see
+  // routers/contact.ts getById) by filtering on entityType = 'contact'.
   transactions: many(transactions),
-  tasks: many(tasks),
   employee: many(employees),
   w2Forms: many(w2Forms),
   taxForms: many(taxForms),

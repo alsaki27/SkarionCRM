@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { router, protectedProcedure, adminProcedure } from '../trpc.js';
 import { db } from '../db/index.js';
-import { contacts, contactCommunications } from '../db/schema.js';
+import { contacts, contactCommunications, documents, tasks } from '../db/schema.js';
 import { eq, and, like, ilike, or, desc, count, gte, lte, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { auditService } from '../services/audit.js';
@@ -65,13 +65,23 @@ export const contactRouter = router({
             orderBy: [desc(contactCommunications.createdAt)],
             limit: 50,
           },
-          documents: true,
-          tasks: true,
         },
       });
-      
+
       if (!contact) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contact not found' });
-      return contact;
+
+      // documents and tasks relate via entityType/entityId (polymorphic), not a
+      // real FK, so they can't be loaded through the relational query builder above.
+      const [contactDocuments, contactTasks] = await Promise.all([
+        db.query.documents.findMany({
+          where: and(eq(documents.entityType, 'contact'), eq(documents.entityId, contact.id)),
+        }),
+        db.query.tasks.findMany({
+          where: and(eq(tasks.entityType, 'contact'), eq(tasks.entityId, contact.id)),
+        }),
+      ]);
+
+      return { ...contact, documents: contactDocuments, tasks: contactTasks };
     }),
 
   create: protectedProcedure
