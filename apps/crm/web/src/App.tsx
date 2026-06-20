@@ -1,39 +1,48 @@
-import { useEffect, useState } from 'react';
-import { listCompanies, type Company } from './api.js';
+import { Suspense } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { AppShell } from './components/layout/AppShell.js';
+import { useAuthStore } from './stores/auth.js';
+import Dashboard from './pages/Dashboard.js';
+import LeadsPage from './pages/LeadsPage.js';
+import LeadDetail from './pages/LeadDetail.js';
+import CompaniesPage from './pages/CompaniesPage.js';
+import ContactsPage from './pages/ContactsPage.js';
+import OpportunitiesPage from './pages/OpportunitiesPage.js';
+import TasksPage from './pages/TasksPage.js';
+import SettingsPage from './pages/SettingsPage.js';
 
-function App() {
-  const [companies, setCompanies] = useState<Company[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    listCompanies()
-      .then((result) => setCompanies(result.companies))
-      .catch((err) => {
-        // crmFetch already redirected to login on a real 401; anything
-        // else here is a genuine error worth surfacing.
-        if (err?.status !== 401) setError(err?.message ?? 'Failed to load.');
-      });
-  }, []);
-
-  if (error) {
-    return <div style={{ padding: 40, fontFamily: 'sans-serif' }}>Error: {error}</div>;
-  }
-
-  if (!companies) {
-    return <div style={{ padding: 40, fontFamily: 'sans-serif' }}>Loading CRM...</div>;
-  }
-
+function Loading() {
   return (
-    <div style={{ padding: 40, fontFamily: 'sans-serif' }}>
-      <h1>Skarion CRM</h1>
-      <p>{companies.length} companies. Full dashboard coming in Chunk 3.</p>
-      <ul>
-        {companies.map((c) => (
-          <li key={c.id}>{c.name}</li>
-        ))}
-      </ul>
+    <div className="flex items-center justify-center h-64">
+      <div className="w-8 h-8 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin" />
     </div>
   );
 }
 
-export default App;
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const isLoading = useAuthStore((s) => s.isLoading);
+  const user = useAuthStore((s) => s.user);
+
+  if (isLoading) return <Loading />;
+  if (!user) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
+export default function App() {
+  return (
+    <AppShell>
+      <Suspense fallback={<Loading />}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/leads" element={<RequireAuth><LeadsPage /></RequireAuth>} />
+          <Route path="/leads/:id" element={<RequireAuth><LeadDetail /></RequireAuth>} />
+          <Route path="/companies" element={<RequireAuth><CompaniesPage /></RequireAuth>} />
+          <Route path="/contacts" element={<RequireAuth><ContactsPage /></RequireAuth>} />
+          <Route path="/opportunities" element={<RequireAuth><OpportunitiesPage /></RequireAuth>} />
+          <Route path="/tasks" element={<RequireAuth><TasksPage /></RequireAuth>} />
+          <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
+        </Routes>
+      </Suspense>
+    </AppShell>
+  );
+}

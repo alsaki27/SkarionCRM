@@ -43,7 +43,7 @@ export function redirectToLogin(): void {
   window.location.href = `${IDENTITY_API_URL}/?return_to=${returnTo}`;
 }
 
-async function crmFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function crmFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!accessToken) {
     const refreshed = await refreshAccessToken();
     if (!refreshed) {
@@ -90,7 +90,101 @@ export interface Company {
   domain: string | null;
   industry: string | null;
   size: string | null;
+  address: unknown;
   ownerId: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+export interface Contact {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string | null;
+  title: string | null;
+  companyId: string | null;
+  ownerId: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'disqualified' | 'converted';
+export type LeadSource = 'website' | 'referral' | 'social_media' | 'cold_call' | 'email_campaign' | 'event' | 'other';
+
+export interface Lead {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string | null;
+  companyName: string | null;
+  companyDomain: string | null;
+  source: LeadSource;
+  status: LeadStatus;
+  notes: string | null;
+  ownerId: string;
+  convertedToContactId: string | null;
+  convertedToCompanyId: string | null;
+  convertedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+export type OpportunityStage = 'prospecting' | 'qualification' | 'proposal' | 'negotiation' | 'closed_won' | 'closed_lost';
+export type Currency = 'USD' | 'EUR' | 'GBP' | 'CAD' | 'AUD' | 'JPY' | 'AED' | 'SAR';
+
+export interface Opportunity {
+  id: string;
+  name: string;
+  companyId: string | null;
+  contactId: string | null;
+  stage: OpportunityStage;
+  amount: string | null;
+  currency: Currency;
+  expectedCloseDate: string | null;
+  probability: number | null;
+  notes: string | null;
+  ownerId: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+export type ActivityType = 'call' | 'email' | 'meeting' | 'note';
+
+export interface Activity {
+  id: string;
+  type: ActivityType;
+  subject: string;
+  content: string | null;
+  contactId: string | null;
+  companyId: string | null;
+  opportunityId: string | null;
+  actorId: string;
+  happenedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  description: string | null;
+  dueDate: string | null;
+  assigneeId: string;
+  contactId: string | null;
+  companyId: string | null;
+  opportunityId: string | null;
+  completedAt: string | null;
+  completedBy: string | null;
+  priority: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
 }
 
 export function listCompanies() {

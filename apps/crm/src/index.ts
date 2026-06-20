@@ -47,7 +47,6 @@ app.use("/api/admin/*", requireAppRole("crm", ["superadmin"]));
 function getRole(c: unknown): string {
   const apps = (c as { get: (key: string) => unknown }).get("apps");
   return (apps as { crm?: string } | undefined)?.crm ?? "";
-  return c.get("apps")?.crm ?? "";
 }
 
 // --- COMPANIES ---
