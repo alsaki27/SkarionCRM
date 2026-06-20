@@ -20,7 +20,7 @@ name: Deploy Identity (Cloudflare)
 
 on:
   push:
-    branches: [cloudflare-platform-rewrite]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
