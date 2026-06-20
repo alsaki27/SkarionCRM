@@ -1,11 +1,19 @@
 import { useState } from 'react';
 import { useContacts, useDeleteEntity } from '../hooks/use-api.js';
-import { Contact, Plus, Search, Trash2 } from 'lucide-react';
+import { Contact as ContactIcon, Plus, Search, Trash2, Pencil } from 'lucide-react';
+import ContactForm from '../components/forms/ContactForm.js';
+import type { Contact } from '../api.js';
 
 export default function ContactsPage() {
   const { data, isLoading } = useContacts();
   const deleteMutation = useDeleteEntity();
   const [search, setSearch] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editContact, setEditContact] = useState<Contact | null>(null);
+
+  const openCreate = () => { setEditContact(null); setModalOpen(true); };
+  const openEdit = (contact: Contact) => { setEditContact(contact); setModalOpen(true); };
+  const closeModal = () => { setModalOpen(false); setEditContact(null); };
 
   const contacts = data?.contacts.filter((c) => !c.deletedAt) ?? [];
   const filtered = contacts.filter((c) =>
@@ -20,11 +28,11 @@ export default function ContactsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Contact size={20} className="text-slate-600" />
+          <ContactIcon size={20} className="text-slate-600" />
           <h1 className="text-xl font-semibold">Contacts</h1>
           <span className="text-sm text-slate-500">({filtered.length})</span>
         </div>
-        <button className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">
+        <button onClick={openCreate} className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">
           <Plus size={16} /> Add Contact
         </button>
       </div>
@@ -60,12 +68,17 @@ export default function ContactsPage() {
                   <td className="px-4 py-3 text-slate-600">{contact.title ?? '—'}</td>
                   <td className="px-4 py-3 text-slate-600">{contact.phone ?? '—'}</td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => deleteMutation.mutate({ type: 'contacts', id: contact.id })}
-                      className="p-1.5 rounded hover:bg-red-100 text-red-500"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={() => openEdit(contact)} className="p-1.5 rounded hover:bg-slate-200 text-slate-500">
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => deleteMutation.mutate({ type: 'contacts', id: contact.id })}
+                        className="p-1.5 rounded hover:bg-red-100 text-red-500"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -76,6 +89,8 @@ export default function ContactsPage() {
           </table>
         </div>
       </div>
+
+      <ContactForm open={modalOpen} onClose={closeModal} contact={editContact} />
     </div>
   );
 }

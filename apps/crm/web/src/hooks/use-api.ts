@@ -65,3 +65,28 @@ export function useDeleteEntity() {
     },
   });
 }
+
+export function useCreateEntity<T extends Record<string, unknown>>(type: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: T) => {
+      return crmFetch<{ [key: string]: unknown }>(`/api/${type}`, { method: 'POST', body: JSON.stringify(data) });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [type] });
+    },
+  });
+}
+
+export function useUpdateEntity<T extends Record<string, unknown>>(type: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: T }) => {
+      return crmFetch<{ [key: string]: unknown }>(`/api/${type}/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: [type] });
+      qc.invalidateQueries({ queryKey: [type, vars.id] });
+    },
+  });
+}

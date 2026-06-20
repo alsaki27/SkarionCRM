@@ -1,13 +1,21 @@
 import { useState } from 'react';
 import { useOpportunities, useDeleteEntity } from '../hooks/use-api.js';
-import { Users, Plus, Search, Trash2 } from 'lucide-react';
+import { Users, Plus, Search, Trash2, Pencil } from 'lucide-react';
 import { cn } from '../lib/utils.js';
+import OpportunityForm from '../components/forms/OpportunityForm.js';
+import type { Opportunity } from '../api.js';
 
 export default function OpportunitiesPage() {
   const { data, isLoading } = useOpportunities();
   const deleteMutation = useDeleteEntity();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | string>('all');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editOpp, setEditOpp] = useState<Opportunity | null>(null);
+
+  const openCreate = () => { setEditOpp(null); setModalOpen(true); };
+  const openEdit = (opp: Opportunity) => { setEditOpp(opp); setModalOpen(true); };
+  const closeModal = () => { setModalOpen(false); setEditOpp(null); };
 
   const opportunities = data?.opportunities.filter((o) => !o.deletedAt) ?? [];
   const stages = [...new Set(opportunities.map((o) => o.stage))];
@@ -30,7 +38,7 @@ export default function OpportunitiesPage() {
           <h1 className="text-xl font-semibold">Opportunities</h1>
           <span className="text-sm text-slate-500">({filtered.length})</span>
         </div>
-        <button className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">
+        <button onClick={openCreate} className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">
           <Plus size={16} /> Add Opportunity
         </button>
       </div>
@@ -100,12 +108,17 @@ export default function OpportunitiesPage() {
                   <td className="px-4 py-3 text-slate-600">{opp.expectedCloseDate ?? '—'}</td>
                   <td className="px-4 py-3 text-slate-600">{opp.probability ? `${opp.probability}%` : '—'}</td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => deleteMutation.mutate({ type: 'opportunities', id: opp.id })}
-                      className="p-1.5 rounded hover:bg-red-100 text-red-500"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={() => openEdit(opp)} className="p-1.5 rounded hover:bg-slate-200 text-slate-500">
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => deleteMutation.mutate({ type: 'opportunities', id: opp.id })}
+                        className="p-1.5 rounded hover:bg-red-100 text-red-500"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -116,6 +129,8 @@ export default function OpportunitiesPage() {
           </table>
         </div>
       </div>
+
+      <OpportunityForm open={modalOpen} onClose={closeModal} opportunity={editOpp} />
     </div>
   );
 }

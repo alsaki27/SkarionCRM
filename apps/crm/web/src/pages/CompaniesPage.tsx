@@ -1,11 +1,19 @@
 import { useState } from 'react';
 import { useCompanies, useDeleteEntity } from '../hooks/use-api.js';
-import { Building2, Plus, Search, Trash2 } from 'lucide-react';
+import { Building2, Plus, Search, Trash2, Pencil } from 'lucide-react';
+import CompanyForm from '../components/forms/CompanyForm.js';
+import type { Company } from '../api.js';
 
 export default function CompaniesPage() {
   const { data, isLoading } = useCompanies();
   const deleteMutation = useDeleteEntity();
   const [search, setSearch] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editCompany, setEditCompany] = useState<Company | null>(null);
+
+  const openCreate = () => { setEditCompany(null); setModalOpen(true); };
+  const openEdit = (company: Company) => { setEditCompany(company); setModalOpen(true); };
+  const closeModal = () => { setModalOpen(false); setEditCompany(null); };
 
   const companies = data?.companies.filter((c) => !c.deletedAt) ?? [];
   const filtered = companies.filter((c) =>
@@ -24,7 +32,7 @@ export default function CompaniesPage() {
           <h1 className="text-xl font-semibold">Companies</h1>
           <span className="text-sm text-slate-500">({filtered.length})</span>
         </div>
-        <button className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">
+        <button onClick={openCreate} className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">
           <Plus size={16} /> Add Company
         </button>
       </div>
@@ -48,12 +56,17 @@ export default function CompaniesPage() {
                 <h3 className="font-semibold">{company.name}</h3>
                 <div className="text-sm text-slate-500 mt-1">{company.domain ?? '—'}</div>
               </div>
-              <button
-                onClick={() => deleteMutation.mutate({ type: 'companies', id: company.id })}
-                className="p-1.5 rounded hover:bg-red-100 text-red-500"
-              >
-                <Trash2 size={14} />
-              </button>
+              <div className="flex gap-1">
+                <button onClick={() => openEdit(company)} className="p-1.5 rounded hover:bg-slate-200 text-slate-500">
+                  <Pencil size={14} />
+                </button>
+                <button
+                  onClick={() => deleteMutation.mutate({ type: 'companies', id: company.id })}
+                  className="p-1.5 rounded hover:bg-red-100 text-red-500"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             </div>
             <div className="flex gap-2 mt-3">
               {company.industry && (
@@ -69,6 +82,8 @@ export default function CompaniesPage() {
           <div className="col-span-full text-center text-slate-400 py-12">No companies found</div>
         )}
       </div>
+
+      <CompanyForm open={modalOpen} onClose={closeModal} company={editCompany} />
     </div>
   );
 }

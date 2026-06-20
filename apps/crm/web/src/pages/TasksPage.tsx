@@ -1,14 +1,22 @@
 import { useState } from 'react';
 import { useTasks, useDeleteEntity } from '../hooks/use-api.js';
-import { CheckSquare, Plus, Search, Trash2, CheckCircle2, Circle } from 'lucide-react';
+import { CheckSquare, Plus, Search, Trash2, CheckCircle2, Circle, Pencil } from 'lucide-react';
 import { cn } from '../lib/utils.js';
 import { crmFetch } from '../api.js';
+import TaskForm from '../components/forms/TaskForm.js';
+import type { Task } from '../api.js';
 
 export default function TasksPage() {
   const { data, isLoading, refetch } = useTasks();
   const deleteMutation = useDeleteEntity();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'open' | 'completed'>('all');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editTask, setEditTask] = useState<Task | null>(null);
+
+  const openCreate = () => { setEditTask(null); setModalOpen(true); };
+  const openEdit = (task: Task) => { setEditTask(task); setModalOpen(true); };
+  const closeModal = () => { setModalOpen(false); setEditTask(null); };
 
   const tasks = data?.tasks.filter((t) => !t.deletedAt) ?? [];
   const filtered = tasks.filter((t) => {
@@ -17,7 +25,7 @@ export default function TasksPage() {
     return matchesSearch && matchesFilter;
   });
 
-  const toggleComplete = async (task: { id: string; completedAt: string | null }) => {
+  const toggleComplete = async (task: Task) => {
     if (task.completedAt) {
       await crmFetch(`/api/tasks/${task.id}/reopen`, { method: 'PUT' });
     } else {
@@ -36,7 +44,7 @@ export default function TasksPage() {
           <h1 className="text-xl font-semibold">Tasks</h1>
           <span className="text-sm text-slate-500">({filtered.length})</span>
         </div>
-        <button className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">
+        <button onClick={openCreate} className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">
           <Plus size={16} /> Add Task
         </button>
       </div>
@@ -94,6 +102,9 @@ export default function TasksPage() {
               )}>
                 {task.priority}
               </span>
+              <button onClick={() => openEdit(task)} className="p-1.5 rounded hover:bg-slate-200 text-slate-500">
+                <Pencil size={14} />
+              </button>
               <button
                 onClick={() => deleteMutation.mutate({ type: 'tasks', id: task.id })}
                 className="p-1.5 rounded hover:bg-red-100 text-red-500"
@@ -107,6 +118,8 @@ export default function TasksPage() {
           <div className="text-center text-slate-400 py-12">No tasks found</div>
         )}
       </div>
+
+      <TaskForm open={modalOpen} onClose={closeModal} task={editTask} />
     </div>
   );
 }

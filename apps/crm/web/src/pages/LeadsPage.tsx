@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useLeads, useDeleteEntity } from '../hooks/use-api.js';
 import { useNavigate } from 'react-router-dom';
-import { Target, Plus, Search, Trash2, ArrowRight } from 'lucide-react';
+import { Target, Plus, Search, Trash2, ArrowRight, Pencil } from 'lucide-react';
 import { cn } from '../lib/utils.js';
+import LeadForm from '../components/forms/LeadForm.js';
+import type { Lead } from '../api.js';
 
 export default function LeadsPage() {
   const { data, isLoading } = useLeads();
@@ -10,6 +12,12 @@ export default function LeadsPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | LeadStatus>('all');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editLead, setEditLead] = useState<Lead | null>(null);
+
+  const openCreate = () => { setEditLead(null); setModalOpen(true); };
+  const openEdit = (lead: Lead) => { setEditLead(lead); setModalOpen(true); };
+  const closeModal = () => { setModalOpen(false); setEditLead(null); };
 
   const leads = data?.leads.filter((l) => !l.deletedAt) ?? [];
   const filtered = leads.filter((l) => {
@@ -38,7 +46,7 @@ export default function LeadsPage() {
           <h1 className="text-xl font-semibold">Leads</h1>
           <span className="text-sm text-slate-500">({filtered.length})</span>
         </div>
-        <button className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">
+        <button onClick={openCreate} className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">
           <Plus size={16} /> Add Lead
         </button>
       </div>
@@ -108,6 +116,12 @@ export default function LeadsPage() {
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button
+                        onClick={(e) => { e.stopPropagation(); openEdit(lead); }}
+                        className="p-1.5 rounded hover:bg-slate-200 text-slate-500"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
                         onClick={(e) => { e.stopPropagation(); navigate(`/leads/${lead.id}`); }}
                         className="p-1.5 rounded hover:bg-slate-200 text-slate-500"
                       >
@@ -130,6 +144,8 @@ export default function LeadsPage() {
           </table>
         </div>
       </div>
+
+      <LeadForm open={modalOpen} onClose={closeModal} lead={editLead} />
     </div>
   );
 }
