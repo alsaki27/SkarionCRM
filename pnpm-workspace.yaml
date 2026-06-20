@@ -2,6 +2,7 @@ packages:
   - 'apps/*'
   - 'apps/identity/admin'
   - 'apps/identity/login'
+  - 'apps/crm/web'
   - 'apps/workers/*'
   - 'packages/*'
 

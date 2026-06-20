@@ -1,0 +1,14 @@
+name = "skarion-crm-platform"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[vars]
+APP_URL = "https://crm.skarion.com"
+
+[env.staging.vars]
+APP_URL = "https://crm-staging.skarion.com"
