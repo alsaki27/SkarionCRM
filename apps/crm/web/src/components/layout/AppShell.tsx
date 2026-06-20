@@ -2,20 +2,21 @@ import { useAuthStore, type AuthStore, type CrmRole } from '../../stores/auth.js
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { cn } from '../../lib/utils.js';
+import { bootstrapAuth } from '../../api.js';
 import {
   LayoutDashboard, Users, Building2, Contact, Target, CheckSquare, Settings, LogOut,
   BarChart, ChevronLeft, ChevronRight, Bell, Search, Menu, X
 } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/', roles: ['superadmin', 'manager', 'outreach', 'viewer'] },
-  { icon: Target, label: 'Leads', path: '/leads', roles: ['superadmin', 'manager', 'outreach'] },
-  { icon: Contact, label: 'Contacts', path: '/contacts', roles: ['superadmin', 'manager', 'outreach', 'viewer'] },
-  { icon: Building2, label: 'Companies', path: '/companies', roles: ['superadmin', 'manager', 'outreach', 'viewer'] },
-  { icon: BarChart, label: 'Pipeline', path: '/pipeline', roles: ['superadmin', 'manager', 'outreach'] },
-  { icon: Users, label: 'Opportunities', path: '/opportunities', roles: ['superadmin', 'manager', 'outreach'] },
-  { icon: CheckSquare, label: 'Tasks', path: '/tasks', roles: ['superadmin', 'manager', 'outreach'] },
-  { icon: Settings, label: 'Settings', path: '/settings', roles: ['superadmin', 'manager'] },
+  { icon: LayoutDashboard, label: 'Dashboard', path: '/', roles: ['manager', 'member'] },
+  { icon: Target, label: 'Leads', path: '/leads', roles: ['manager', 'member'] },
+  { icon: Contact, label: 'Contacts', path: '/contacts', roles: ['manager', 'member'] },
+  { icon: Building2, label: 'Companies', path: '/companies', roles: ['manager', 'member'] },
+  { icon: BarChart, label: 'Pipeline', path: '/pipeline', roles: ['manager', 'member'] },
+  { icon: Users, label: 'Opportunities', path: '/opportunities', roles: ['manager', 'member'] },
+  { icon: CheckSquare, label: 'Tasks', path: '/tasks', roles: ['manager', 'member'] },
+  { icon: Settings, label: 'Settings', path: '/settings', roles: ['manager'] },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -27,15 +28,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!user) {
-      fetch('https://auth.skarion.com/auth/refresh', { method: 'POST', credentials: 'include' })
-        .then((r) => r.ok ? r.json() : Promise.reject())
-        .then((data) => {
-          useAuthStore.getState().setUser({
-            id: data.user?.id ?? '',
-            email: data.user?.email ?? '',
-            name: data.user?.name,
-            role: (data.user?.apps?.crm ?? '') as CrmRole,
-          });
+      bootstrapAuth()
+        .then((authUser) => {
+          if (authUser) {
+            useAuthStore.getState().setUser({
+              id: authUser.id,
+              email: authUser.email,
+              name: authUser.name,
+              role: authUser.role as CrmRole,
+            });
+          } else {
+            useAuthStore.getState().setLoading(false);
+          }
         })
         .catch(() => useAuthStore.getState().setLoading(false));
     }

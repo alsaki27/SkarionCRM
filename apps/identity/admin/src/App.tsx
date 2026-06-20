@@ -15,7 +15,7 @@ function Gate({ children }: { children: React.ReactElement }) {
   if (!isSuperadmin) {
     return (
       <p style={{ padding: 24 }}>
-        Access denied. This area requires crm:superadmin or books:superadmin.
+        Access denied. This area requires global superadmin.
       </p>
     );
   }

@@ -17,10 +17,10 @@ head_sampling_rate = 1
 # MFA_ENCRYPTION_KEY, INVITATION_TOKEN_PEPPER) are set via
 # `wrangler secret put <NAME>` or the deploy workflow - never committed here.
 [vars]
-APP_URL = "https://auth.skarion.com"
+APP_URL = "https://skarion-identity.alsaki1999.workers.dev"
 
 [env.staging.vars]
-APP_URL = "https://auth-staging.skarion.com"
+APP_URL = "https://skarion-identity-staging.alsaki1999.workers.dev"
 
 # No Hyperdrive binding: Hyperdrive proxies the Postgres wire protocol
 # (TCP), but this Worker uses @neondatabase/serverless's neon-http driver

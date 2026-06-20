@@ -28,6 +28,7 @@ import {
   timestamp,
   uniqueIndex,
   integer,
+  boolean,
   index,
   uuid,
   jsonb,
@@ -60,6 +61,7 @@ export const users = identitySchema.table(
     // Bumped on password change / forced logout to invalidate already-issued
     // access JWTs (their embedded `ver` claim stops matching on next check).
     tokenVersion: integer('token_version').notNull().default(1),
+    isSuperadmin: boolean('is_superadmin').default(false).notNull(),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
     disabledAt: timestamp('disabled_at', { withTimezone: true }),
     ...timestamps(),

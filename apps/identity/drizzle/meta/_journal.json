@@ -15,6 +15,13 @@
       "when": 1781938519061,
       "tag": "0001_outstanding_nova",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781991756798,
+      "tag": "0002_nosy_loki",
+      "breakpoints": true
     }
   ]
 }

@@ -5,7 +5,7 @@ export default function SettingsPage() {
   const role = useAuthStore((s: AuthStore) => s.user?.role ?? '');
   const user = useAuthStore((s: AuthStore) => s.user);
 
-  const isManager = role === 'superadmin' || role === 'manager';
+  const isManager = role === 'manager';
 
   return (
     <div className="space-y-6">

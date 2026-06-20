@@ -9,11 +9,11 @@
 
 // VITE_API_URL is already configured as a Cloudflare Pages env var for this
 // project (set when the Worker was first deployed) - reusing that name
-// rather than introducing a new, unconfigured one. Identity's URL is
-// hardcoded rather than env-configured since it's the same constant
-// auth.skarion.com referenced by every app in this monorepo.
-const CRM_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8788';
-const IDENTITY_API_URL = 'https://auth.skarion.com';
+// rather than introducing a new, unconfigured one. Identity's URL is also
+// env-configurable via VITE_IDENTITY_API_URL so it can be changed in one
+// place (dashboard env var or local .env) without a grep-and-replace.
+export const CRM_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8788';
+export const IDENTITY_API_URL = import.meta.env.VITE_IDENTITY_API_URL || 'https://skarion-identity.alsaki1999.workers.dev';
 
 let accessToken: string | null = null;
 
@@ -26,7 +26,10 @@ export class ApiError extends Error {
   }
 }
 
-async function refreshAccessToken(): Promise<string | null> {
+/** Shared refresh: hits identity's /auth/refresh and stores the token in
+ *  api.ts's module-level variable. All apps should call this (not raw fetch)
+ *  so there's a single source of truth for the access token. */
+export async function refreshAccessToken(): Promise<string | null> {
   const response = await fetch(`${IDENTITY_API_URL}/auth/refresh`, {
     method: 'POST',
     credentials: 'include',
@@ -35,6 +38,25 @@ async function refreshAccessToken(): Promise<string | null> {
   const data = (await response.json()) as { access_token: string };
   accessToken = data.access_token;
   return accessToken;
+}
+
+/** Bootstraps the auth store by refreshing the token once. Returns the
+ *  user payload if the refresh succeeds, null otherwise. Safe to call
+ *  from any app's mount effect. */
+export async function bootstrapAuth(): Promise<{ id: string; email: string; name?: string; role: string } | null> {
+  const response = await fetch(`${IDENTITY_API_URL}/auth/refresh`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  if (!response.ok) return null;
+  const data = (await response.json()) as { access_token: string; user: { id: string; email: string; name?: string; apps: Record<string, string> } };
+  accessToken = data.access_token;
+  return {
+    id: data.user.id,
+    email: data.user.email,
+    name: data.user.name,
+    role: data.user.apps?.crm ?? '',
+  };
 }
 
 /** Redirects to the public login app, returning here after a successful login. */

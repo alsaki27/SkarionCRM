@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { getDb, withAudit } from "@skarion/db-kit";
-import { requireAuth, requireAppRole, type AuthedVariables } from "@skarion/auth-client";
+import { requireAuth, requireSuperadmin, type AuthedVariables } from "@skarion/auth-client";
 import { can } from "@skarion/permissions";
 import { parseContactsCsv, parseCompaniesCsv, parseLeadsCsv } from "@skarion/importers";
 import * as schema from "./db/schema.js";
@@ -42,7 +42,7 @@ app.use("*", async (c, next) => {
 app.get("/health", (c) => c.json({ status: "ok", service: "skarion-crm-platform" }));
 
 app.use("/api/*", requireAuth);
-app.use("/api/admin/*", requireAppRole("crm", ["superadmin"]));
+app.use("/api/admin/*", requireSuperadmin());
 
 function getRole(c: unknown): string {
   const apps = (c as { get: (key: string) => unknown }).get("apps");
@@ -54,13 +54,14 @@ function getRole(c: unknown): string {
 app.get("/api/companies", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const role = getRole(c);
-  const caller = { userId: c.get("userId"), managedUserIds: undefined };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), managedUserIds: undefined, isSuperadmin };
   if (!role) return c.json({ error: "Forbidden." }, 403);
 
   const { search, industry, owner } = c.req.query();
   const conditions = [isNull(schema.companies.deletedAt)];
 
-  if (role !== "superadmin") {
+  if (!isSuperadmin) {
     conditions.push(eq(schema.companies.ownerId, caller.userId));
   }
   if (search) {
@@ -80,8 +81,9 @@ app.get("/api/companies", async (c) => {
 app.post("/api/companies", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
-  if (!can(role, "create", { ownerId: caller.userId }, caller)) {
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
+  if (!can(isSuperadmin, role, "create", { ownerId: caller.userId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -113,12 +115,13 @@ app.get("/api/companies/:id", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
 
   const [row] = await db.select().from(schema.companies)
     .where(and(eq(schema.companies.id, id), isNull(schema.companies.deletedAt)));
   if (!row) return c.json({ error: "Not found." }, 404);
-  if (!can(role, "view", { ownerId: row.ownerId }, caller)) {
+  if (!can(isSuperadmin, role, "view", { ownerId: row.ownerId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -129,12 +132,13 @@ app.put("/api/companies/:id", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
 
   const [existing] = await db.select().from(schema.companies)
     .where(and(eq(schema.companies.id, id), isNull(schema.companies.deletedAt)));
   if (!existing) return c.json({ error: "Not found." }, 404);
-  if (!can(role, "edit", { ownerId: existing.ownerId }, caller)) {
+  if (!can(isSuperadmin, role, "edit", { ownerId: existing.ownerId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -145,7 +149,7 @@ app.put("/api/companies/:id", async (c) => {
   if (body.industry !== undefined) update.industry = body.industry;
   if (body.size !== undefined) update.size = body.size;
   if (body.address !== undefined) update.address = body.address;
-  if (body.ownerId !== undefined && role === "superadmin") update.ownerId = body.ownerId;
+  if (body.ownerId !== undefined && isSuperadmin) update.ownerId = body.ownerId;
   update.updatedAt = new Date();
 
   const [result] = await db.update(schema.companies).set(update)
@@ -168,12 +172,13 @@ app.delete("/api/companies/:id", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
 
   const [existing] = await db.select().from(schema.companies)
     .where(and(eq(schema.companies.id, id), isNull(schema.companies.deletedAt)));
   if (!existing) return c.json({ error: "Not found." }, 404);
-  if (!can(role, "delete", { ownerId: existing.ownerId }, caller)) {
+  if (!can(isSuperadmin, role, "delete", { ownerId: existing.ownerId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -199,13 +204,14 @@ app.delete("/api/companies/:id", async (c) => {
 app.get("/api/contacts", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), managedUserIds: undefined, isSuperadmin };
   if (!role) return c.json({ error: "Forbidden." }, 403);
 
   const { search, companyId, owner } = c.req.query();
   const conditions = [isNull(schema.contacts.deletedAt)];
 
-  if (role !== "superadmin") {
+  if (!isSuperadmin) {
     conditions.push(eq(schema.contacts.ownerId, caller.userId));
   }
   if (search) {
@@ -225,8 +231,9 @@ app.get("/api/contacts", async (c) => {
 app.post("/api/contacts", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
-  if (!can(role, "create", { ownerId: caller.userId }, caller)) {
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
+  if (!can(isSuperadmin, role, "create", { ownerId: caller.userId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -259,12 +266,13 @@ app.get("/api/contacts/:id", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
 
   const [row] = await db.select().from(schema.contacts)
     .where(and(eq(schema.contacts.id, id), isNull(schema.contacts.deletedAt)));
   if (!row) return c.json({ error: "Not found." }, 404);
-  if (!can(role, "view", { ownerId: row.ownerId }, caller)) {
+  if (!can(isSuperadmin, role, "view", { ownerId: row.ownerId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -275,12 +283,13 @@ app.put("/api/contacts/:id", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
 
   const [existing] = await db.select().from(schema.contacts)
     .where(and(eq(schema.contacts.id, id), isNull(schema.contacts.deletedAt)));
   if (!existing) return c.json({ error: "Not found." }, 404);
-  if (!can(role, "edit", { ownerId: existing.ownerId }, caller)) {
+  if (!can(isSuperadmin, role, "edit", { ownerId: existing.ownerId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -292,7 +301,7 @@ app.put("/api/contacts/:id", async (c) => {
   if (body.phone !== undefined) update.phone = body.phone;
   if (body.title !== undefined) update.title = body.title;
   if (body.companyId !== undefined) update.companyId = body.companyId;
-  if (body.ownerId !== undefined && role === "superadmin") update.ownerId = body.ownerId;
+  if (body.ownerId !== undefined && isSuperadmin) update.ownerId = body.ownerId;
   update.updatedAt = new Date();
 
   const [result] = await db.update(schema.contacts).set(update)
@@ -315,12 +324,13 @@ app.delete("/api/contacts/:id", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
 
   const [existing] = await db.select().from(schema.contacts)
     .where(and(eq(schema.contacts.id, id), isNull(schema.contacts.deletedAt)));
   if (!existing) return c.json({ error: "Not found." }, 404);
-  if (!can(role, "delete", { ownerId: existing.ownerId }, caller)) {
+  if (!can(isSuperadmin, role, "delete", { ownerId: existing.ownerId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -346,13 +356,14 @@ app.delete("/api/contacts/:id", async (c) => {
 app.get("/api/leads", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), managedUserIds: undefined, isSuperadmin };
   if (!role) return c.json({ error: "Forbidden." }, 403);
 
   const { status, source, search, owner } = c.req.query();
   const conditions = [isNull(schema.leads.deletedAt)];
 
-  if (role !== "superadmin") {
+  if (!isSuperadmin) {
     conditions.push(eq(schema.leads.ownerId, caller.userId));
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -375,8 +386,9 @@ app.get("/api/leads", async (c) => {
 app.post("/api/leads", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
-  if (!can(role, "create", { ownerId: caller.userId }, caller)) {
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
+  if (!can(isSuperadmin, role, "create", { ownerId: caller.userId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -414,12 +426,13 @@ app.get("/api/leads/:id", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
 
   const [row] = await db.select().from(schema.leads)
     .where(and(eq(schema.leads.id, id), isNull(schema.leads.deletedAt)));
   if (!row) return c.json({ error: "Not found." }, 404);
-  if (!can(role, "view", { ownerId: row.ownerId }, caller)) {
+  if (!can(isSuperadmin, role, "view", { ownerId: row.ownerId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -430,12 +443,13 @@ app.put("/api/leads/:id", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
 
   const [existing] = await db.select().from(schema.leads)
     .where(and(eq(schema.leads.id, id), isNull(schema.leads.deletedAt)));
   if (!existing) return c.json({ error: "Not found." }, 404);
-  if (!can(role, "edit", { ownerId: existing.ownerId }, caller)) {
+  if (!can(isSuperadmin, role, "edit", { ownerId: existing.ownerId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -452,7 +466,7 @@ app.put("/api/leads/:id", async (c) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if (body.status !== undefined) update.status = body.status as any;
   if (body.notes !== undefined) update.notes = body.notes;
-  if (body.ownerId !== undefined && role === "superadmin") update.ownerId = body.ownerId;
+  if (body.ownerId !== undefined && isSuperadmin) update.ownerId = body.ownerId;
   update.updatedAt = new Date();
 
   const [result] = await db.update(schema.leads).set(update)
@@ -475,12 +489,13 @@ app.delete("/api/leads/:id", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
 
   const [existing] = await db.select().from(schema.leads)
     .where(and(eq(schema.leads.id, id), isNull(schema.leads.deletedAt)));
   if (!existing) return c.json({ error: "Not found." }, 404);
-  if (!can(role, "delete", { ownerId: existing.ownerId }, caller)) {
+  if (!can(isSuperadmin, role, "delete", { ownerId: existing.ownerId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -505,12 +520,13 @@ app.post("/api/leads/:id/convert", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
 
   const [lead] = await db.select().from(schema.leads)
     .where(and(eq(schema.leads.id, id), isNull(schema.leads.deletedAt)));
   if (!lead) return c.json({ error: "Not found." }, 404);
-  if (!can(role, "edit", { ownerId: lead.ownerId }, caller)) {
+  if (!can(isSuperadmin, role, "edit", { ownerId: lead.ownerId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
   if (lead.status === "converted") {
@@ -592,13 +608,14 @@ app.post("/api/leads/:id/convert", async (c) => {
 app.get("/api/opportunities", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), managedUserIds: undefined, isSuperadmin };
   if (!role) return c.json({ error: "Forbidden." }, 403);
 
   const { stage, search, owner } = c.req.query();
   const conditions = [isNull(schema.opportunities.deletedAt)];
 
-  if (role !== "superadmin") {
+  if (!isSuperadmin) {
     conditions.push(eq(schema.opportunities.ownerId, caller.userId));
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -619,8 +636,9 @@ app.get("/api/opportunities", async (c) => {
 app.post("/api/opportunities", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
-  if (!can(role, "create", { ownerId: caller.userId }, caller)) {
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
+  if (!can(isSuperadmin, role, "create", { ownerId: caller.userId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -658,12 +676,13 @@ app.get("/api/opportunities/:id", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
 
   const [row] = await db.select().from(schema.opportunities)
     .where(and(eq(schema.opportunities.id, id), isNull(schema.opportunities.deletedAt)));
   if (!row) return c.json({ error: "Not found." }, 404);
-  if (!can(role, "view", { ownerId: row.ownerId }, caller)) {
+  if (!can(isSuperadmin, role, "view", { ownerId: row.ownerId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -674,12 +693,13 @@ app.put("/api/opportunities/:id", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
 
   const [existing] = await db.select().from(schema.opportunities)
     .where(and(eq(schema.opportunities.id, id), isNull(schema.opportunities.deletedAt)));
   if (!existing) return c.json({ error: "Not found." }, 404);
-  if (!can(role, "edit", { ownerId: existing.ownerId }, caller)) {
+  if (!can(isSuperadmin, role, "edit", { ownerId: existing.ownerId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -696,7 +716,7 @@ app.put("/api/opportunities/:id", async (c) => {
   if (body.expectedCloseDate !== undefined) update.expectedCloseDate = body.expectedCloseDate;
   if (body.probability !== undefined) update.probability = body.probability;
   if (body.notes !== undefined) update.notes = body.notes;
-  if (body.ownerId !== undefined && role === "superadmin") update.ownerId = body.ownerId;
+  if (body.ownerId !== undefined && isSuperadmin) update.ownerId = body.ownerId;
   update.updatedAt = new Date();
 
   const [result] = await db.update(schema.opportunities).set(update)
@@ -719,12 +739,13 @@ app.delete("/api/opportunities/:id", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
 
   const [existing] = await db.select().from(schema.opportunities)
     .where(and(eq(schema.opportunities.id, id), isNull(schema.opportunities.deletedAt)));
   if (!existing) return c.json({ error: "Not found." }, 404);
-  if (!can(role, "delete", { ownerId: existing.ownerId }, caller)) {
+  if (!can(isSuperadmin, role, "delete", { ownerId: existing.ownerId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -778,8 +799,9 @@ app.get("/api/activities", async (c) => {
 app.post("/api/activities", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
-  if (!can(role, "create", { ownerId: caller.userId }, caller)) {
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
+  if (!can(isSuperadmin, role, "create", { ownerId: caller.userId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -813,13 +835,13 @@ app.post("/api/activities", async (c) => {
 app.get("/api/activities/:id", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
-  const role = getRole(c);
+  const isSuperadmin = c.get("isSuperadmin");
   const caller = { userId: c.get("userId") };
 
   const [row] = await db.select().from(schema.activities)
     .where(eq(schema.activities.id, id));
   if (!row) return c.json({ error: "Not found." }, 404);
-  if (role !== "superadmin" && row.actorId !== caller.userId) {
+  if (!isSuperadmin && row.actorId !== caller.userId) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -829,13 +851,13 @@ app.get("/api/activities/:id", async (c) => {
 app.put("/api/activities/:id", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
-  const role = getRole(c);
+  const isSuperadmin = c.get("isSuperadmin");
   const caller = { userId: c.get("userId") };
 
   const [existing] = await db.select().from(schema.activities)
     .where(eq(schema.activities.id, id));
   if (!existing) return c.json({ error: "Not found." }, 404);
-  if (role !== "superadmin" && existing.actorId !== caller.userId) {
+  if (!isSuperadmin && existing.actorId !== caller.userId) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -870,13 +892,13 @@ app.put("/api/activities/:id", async (c) => {
 app.delete("/api/activities/:id", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
-  const role = getRole(c);
+  const isSuperadmin = c.get("isSuperadmin");
   const caller = { userId: c.get("userId") };
 
   const [existing] = await db.select().from(schema.activities)
     .where(eq(schema.activities.id, id));
   if (!existing) return c.json({ error: "Not found." }, 404);
-  if (role !== "superadmin" && existing.actorId !== caller.userId) {
+  if (!isSuperadmin && existing.actorId !== caller.userId) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -899,13 +921,14 @@ app.delete("/api/activities/:id", async (c) => {
 app.get("/api/tasks", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), managedUserIds: undefined, isSuperadmin };
   if (!role) return c.json({ error: "Forbidden." }, 403);
 
   const { assigneeId, contactId, companyId, opportunityId, completed, priority } = c.req.query();
   const conditions = [isNull(schema.tasks.deletedAt)];
 
-  if (role !== "superadmin") {
+  if (!isSuperadmin) {
     conditions.push(eq(schema.tasks.assigneeId, caller.userId));
   }
   if (assigneeId) conditions.push(eq(schema.tasks.assigneeId, assigneeId));
@@ -927,8 +950,9 @@ app.get("/api/tasks", async (c) => {
 app.post("/api/tasks", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
-  if (!can(role, "create", { ownerId: caller.userId }, caller)) {
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
+  if (!can(isSuperadmin, role, "create", { ownerId: caller.userId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -962,12 +986,13 @@ app.get("/api/tasks/:id", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
 
   const [row] = await db.select().from(schema.tasks)
     .where(and(eq(schema.tasks.id, id), isNull(schema.tasks.deletedAt)));
   if (!row) return c.json({ error: "Not found." }, 404);
-  if (!can(role, "view", { ownerId: row.assigneeId }, caller)) {
+  if (!can(isSuperadmin, role, "view", { ownerId: row.assigneeId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -978,12 +1003,13 @@ app.put("/api/tasks/:id", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
 
   const [existing] = await db.select().from(schema.tasks)
     .where(and(eq(schema.tasks.id, id), isNull(schema.tasks.deletedAt)));
   if (!existing) return c.json({ error: "Not found." }, 404);
-  if (!can(role, "edit", { ownerId: existing.assigneeId }, caller)) {
+  if (!can(isSuperadmin, role, "edit", { ownerId: existing.assigneeId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -1019,12 +1045,13 @@ app.put("/api/tasks/:id/complete", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
 
   const [existing] = await db.select().from(schema.tasks)
     .where(and(eq(schema.tasks.id, id), isNull(schema.tasks.deletedAt)));
   if (!existing) return c.json({ error: "Not found." }, 404);
-  if (!can(role, "edit", { ownerId: existing.assigneeId }, caller)) {
+  if (!can(isSuperadmin, role, "edit", { ownerId: existing.assigneeId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -1052,12 +1079,13 @@ app.put("/api/tasks/:id/reopen", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
 
   const [existing] = await db.select().from(schema.tasks)
     .where(and(eq(schema.tasks.id, id), isNull(schema.tasks.deletedAt)));
   if (!existing) return c.json({ error: "Not found." }, 404);
-  if (!can(role, "edit", { ownerId: existing.assigneeId }, caller)) {
+  if (!can(isSuperadmin, role, "edit", { ownerId: existing.assigneeId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -1085,12 +1113,13 @@ app.delete("/api/tasks/:id", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
 
   const [existing] = await db.select().from(schema.tasks)
     .where(and(eq(schema.tasks.id, id), isNull(schema.tasks.deletedAt)));
   if (!existing) return c.json({ error: "Not found." }, 404);
-  if (!can(role, "delete", { ownerId: existing.assigneeId }, caller)) {
+  if (!can(isSuperadmin, role, "delete", { ownerId: existing.assigneeId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -1116,8 +1145,9 @@ app.delete("/api/tasks/:id", async (c) => {
 app.post("/api/import/companies", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
-  if (!can(role, "create", { ownerId: caller.userId }, caller)) {
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
+  if (!can(isSuperadmin, role, "create", { ownerId: caller.userId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -1147,8 +1177,9 @@ app.post("/api/import/companies", async (c) => {
 app.post("/api/import/contacts", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
-  if (!can(role, "create", { ownerId: caller.userId }, caller)) {
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
+  if (!can(isSuperadmin, role, "create", { ownerId: caller.userId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 
@@ -1189,8 +1220,9 @@ app.post("/api/import/contacts", async (c) => {
 app.post("/api/import/leads", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const role = getRole(c);
-  const caller = { userId: c.get("userId") };
-  if (!can(role, "create", { ownerId: caller.userId }, caller)) {
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
+  if (!can(isSuperadmin, role, "create", { ownerId: caller.userId }, caller)) {
     return c.json({ error: "Forbidden." }, 403);
   }
 

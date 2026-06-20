@@ -10,10 +10,9 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
-/** Access policy per ticket 1.6: crm:superadmin OR books:superadmin. */
 function checkIsSuperadmin(user: MeResponse | null): boolean {
   if (!user) return false;
-  return user.apps.crm === 'superadmin' || user.apps.books === 'superadmin';
+  return user.isSuperadmin;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

@@ -83,7 +83,7 @@ export async function login(db: IdentityDb, params: LoginParams): Promise<LoginR
 
   const apps = await getActiveMemberships(db, found.id);
   const accessToken = await signAccessToken(
-    { userId: found.id, email: found.email, apps, tokenVersion: found.tokenVersion },
+    { userId: found.id, email: found.email, apps, isSuperadmin: found.isSuperadmin, tokenVersion: found.tokenVersion },
     params.jwtSecret
   );
 
@@ -132,7 +132,7 @@ export async function refresh(db: IdentityDb, params: RefreshParams): Promise<Lo
 
   const apps = await getActiveMemberships(db, user.id);
   const accessToken = await signAccessToken(
-    { userId: user.id, email: user.email, apps, tokenVersion: user.tokenVersion },
+    { userId: user.id, email: user.email, apps, isSuperadmin: user.isSuperadmin, tokenVersion: user.tokenVersion },
     params.jwtSecret
   );
 
@@ -294,6 +294,7 @@ export async function getMe(
   displayName: string;
   avatarUrl: string | null;
   apps: AppMembershipsMap;
+  isSuperadmin: boolean;
   mfaEnrolled: boolean;
 }> {
   const user = await db.query.users.findFirst({ where: eq(schema.users.id, userId) });
@@ -308,6 +309,7 @@ export async function getMe(
     displayName: user.displayName,
     avatarUrl: user.avatarUrl,
     apps,
+    isSuperadmin: user.isSuperadmin,
     mfaEnrolled: !!mfa?.enrolledAt,
   };
 }

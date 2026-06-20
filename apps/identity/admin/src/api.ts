@@ -78,6 +78,7 @@ export interface MeResponse {
   displayName: string;
   avatarUrl: string | null;
   apps: AppMembershipsMap;
+  isSuperadmin: boolean;
   mfaEnrolled: boolean;
 }
 

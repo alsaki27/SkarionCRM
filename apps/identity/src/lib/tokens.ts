@@ -16,7 +16,7 @@ const ACCESS_TOKEN_TTL_SECONDS = 15 * 60; // 15 minutes
 // identity-issued tokens, so there's one implementation, not N copies that
 // could drift. Signing stays here: only identity ever signs a token.
 export async function signAccessToken(
-  params: { userId: string; email: string; apps: AppMembershipsMap; tokenVersion: number },
+  params: { userId: string; email: string; apps: AppMembershipsMap; isSuperadmin: boolean; tokenVersion: number },
   secret: string
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
@@ -24,6 +24,7 @@ export async function signAccessToken(
     sub: params.userId,
     email: params.email,
     apps: params.apps,
+    isSuperadmin: params.isSuperadmin,
     ver: params.tokenVersion,
     iat: now,
     exp: now + ACCESS_TOKEN_TTL_SECONDS,

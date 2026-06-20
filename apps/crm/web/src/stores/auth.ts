@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type CrmRole = 'superadmin' | 'manager' | 'outreach' | 'viewer' | '';
+export type CrmRole = 'manager' | 'member' | '';
 
 interface User {
   id: string;
@@ -24,6 +24,6 @@ export const useAuthStore = create<AuthStore>((set) => ({
   setLoading: (isLoading) => set({ isLoading }),
   logout: () => {
     set({ user: null, isLoading: false });
-    window.location.href = 'https://auth.skarion.com/logout';
+    window.location.href = 'https://skarion-identity.alsaki1999.workers.dev/logout';
   },
 }));

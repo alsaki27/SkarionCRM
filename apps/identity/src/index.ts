@@ -24,15 +24,24 @@ import type { AppName, Env } from './lib/types.js';
 
 const APP_LABELS: Record<AppName, string> = { crm: 'CRM', hr: 'Employee Portal', books: 'Books' };
 const APP_SUBDOMAINS: Record<AppName, string> = { crm: 'crm', hr: 'team', books: 'books' };
+const APP_PAGES_SUBDOMAINS: Record<AppName, string> = { crm: 'skarion-crm', hr: 'skarion-hr', books: 'skarion-books' };
 
-/** Derives e.g. https://crm.skarion.com from the identity app's own https://auth.skarion.com. */
+/** Derives e.g. https://crm.skarion.com from the identity app's own https://auth.skarion.com.
+ *  For workers.dev / pages.dev deployments, returns the known Pages subdomain. */
 function appUrlFor(identityAppUrl: string, app: AppName): string {
   try {
     const url = new URL(identityAppUrl);
-    const rootDomain = url.hostname.split('.').slice(-2).join('.'); // auth.skarion.com -> skarion.com
-    return `${url.protocol}//${APP_SUBDOMAINS[app]}.${rootDomain}`;
+    const hostname = url.hostname;
+    if (hostname.endsWith('.skarion.com')) {
+      const rootDomain = hostname.split('.').slice(-2).join('.'); // auth.skarion.com -> skarion.com
+      return `${url.protocol}//${APP_SUBDOMAINS[app]}.${rootDomain}`;
+    }
+    if (hostname.endsWith('.workers.dev') || hostname.endsWith('.pages.dev')) {
+      return `${url.protocol}//${APP_PAGES_SUBDOMAINS[app]}.pages.dev`;
+    }
+    return identityAppUrl; // local dev fallback
   } catch {
-    return identityAppUrl; // local dev fallback - APP_URL may just be http://localhost:xxxx
+    return identityAppUrl;
   }
 }
 
@@ -51,6 +60,8 @@ function isAllowedOrigin(origin: string, appUrl: string): boolean {
     /* APP_URL not set yet in local dev - fall through */
   }
   if (/^https:\/\/([a-z0-9-]+\.)*skarion\.com$/.test(origin)) return true;
+  if (/^https:\/\/([a-z0-9-]+\.)*pages\.dev$/.test(origin)) return true;
+  if (/^https:\/\/([a-z0-9-]+\.)*workers\.dev$/.test(origin)) return true;
   if (origin.startsWith('http://localhost:')) return true;
   return false;
 }
@@ -111,9 +122,9 @@ function errorResponse(c: AppContext, err: unknown) {
   return c.json({ error: 'Internal server error.' }, 500);
 }
 
-/** True if the caller holds 'admin' or 'superadmin' in at least one app. */
-function isPlatformAdmin(apps: Record<string, string>): boolean {
-  return Object.values(apps).some((role) => role === 'admin' || role === 'superadmin');
+/** True if the caller is a global superadmin. */
+function isPlatformAdmin(c: AppContext): boolean {
+  return c.get('isSuperadmin');
 }
 
 /** Hono can't statically prove a `:param` is present; routes below always register it, so a missing value is a 400, not a type error to suppress. */
@@ -259,7 +270,7 @@ app.get('/me', requireAuth, async (c) => {
 // ─────────────────────────────────────────────────────────
 
 app.get('/invitations', requireAuth, async (c) => {
-  if (!isPlatformAdmin(c.get('apps'))) return c.json({ error: 'Forbidden.' }, 403);
+  if (!isPlatformAdmin(c)) return c.json({ error: 'Forbidden.' }, 403);
   const db = getDb(c.env, schema);
   const status = c.req.query('status') as invitationService.InvitationStatus | undefined;
   const invitations = await invitationService.listInvitations(db, { status });
@@ -271,10 +282,8 @@ app.post('/invitations', requireAuth, async (c) => {
   if (!body.email || !APP_NAMES.includes(body.app) || !body.role) {
     return c.json({ error: 'email, app, and role are required.' }, 400);
   }
-  const apps = c.get('apps');
-  const role = apps[body.app];
-  if (role !== 'admin' && role !== 'superadmin') {
-    return c.json({ error: 'Forbidden: requires admin/superadmin on the target app.' }, 403);
+  if (!isPlatformAdmin(c)) {
+    return c.json({ error: 'Forbidden: requires superadmin.' }, 403);
   }
 
   const db = getDb(c.env, schema);
@@ -341,7 +350,7 @@ app.post('/invitations/accept', async (c) => {
 });
 
 app.post('/invitations/:id/revoke', requireAuth, async (c) => {
-  if (!isPlatformAdmin(c.get('apps'))) return c.json({ error: 'Forbidden.' }, 403);
+  if (!isPlatformAdmin(c)) return c.json({ error: 'Forbidden.' }, 403);
   const db = getDb(c.env, schema);
   try {
     await invitationService.revokeInvitation(db, {
@@ -355,7 +364,7 @@ app.post('/invitations/:id/revoke', requireAuth, async (c) => {
 });
 
 app.post('/invitations/:id/resend', requireAuth, async (c) => {
-  if (!isPlatformAdmin(c.get('apps'))) return c.json({ error: 'Forbidden.' }, 403);
+  if (!isPlatformAdmin(c)) return c.json({ error: 'Forbidden.' }, 403);
   const db = getDb(c.env, schema);
   try {
     const result = await invitationService.resendInvitation(db, {
@@ -384,14 +393,14 @@ app.post('/invitations/:id/resend', requireAuth, async (c) => {
 // ─────────────────────────────────────────────────────────
 
 app.get('/admin/users', requireAuth, async (c) => {
-  if (!isPlatformAdmin(c.get('apps'))) return c.json({ error: 'Forbidden.' }, 403);
+  if (!isPlatformAdmin(c)) return c.json({ error: 'Forbidden.' }, 403);
   const db = getDb(c.env, schema);
   const users = await adminService.listUsers(db);
   return c.json({ users });
 });
 
 app.patch('/admin/users/:id/memberships', requireAuth, async (c) => {
-  if (!isPlatformAdmin(c.get('apps'))) return c.json({ error: 'Forbidden.' }, 403);
+  if (!isPlatformAdmin(c)) return c.json({ error: 'Forbidden.' }, 403);
   const body = await c.req.json<{ memberships: { app: AppName; role: string | null }[] }>();
   const db = getDb(c.env, schema);
   try {
@@ -407,7 +416,7 @@ app.patch('/admin/users/:id/memberships', requireAuth, async (c) => {
 });
 
 app.post('/admin/users/:id/disable', requireAuth, async (c) => {
-  if (!isPlatformAdmin(c.get('apps'))) return c.json({ error: 'Forbidden.' }, 403);
+  if (!isPlatformAdmin(c)) return c.json({ error: 'Forbidden.' }, 403);
   const db = getDb(c.env, schema);
   try {
     await adminService.disableUser(db, {
@@ -421,7 +430,7 @@ app.post('/admin/users/:id/disable', requireAuth, async (c) => {
 });
 
 app.post('/admin/users/:id/enable', requireAuth, async (c) => {
-  if (!isPlatformAdmin(c.get('apps'))) return c.json({ error: 'Forbidden.' }, 403);
+  if (!isPlatformAdmin(c)) return c.json({ error: 'Forbidden.' }, 403);
   const db = getDb(c.env, schema);
   try {
     await adminService.enableUser(db, {
@@ -435,7 +444,7 @@ app.post('/admin/users/:id/enable', requireAuth, async (c) => {
 });
 
 app.post('/admin/users/:id/force-password-reset', requireAuth, async (c) => {
-  if (!isPlatformAdmin(c.get('apps'))) return c.json({ error: 'Forbidden.' }, 403);
+  if (!isPlatformAdmin(c)) return c.json({ error: 'Forbidden.' }, 403);
   const db = getDb(c.env, schema);
   try {
     const result = await adminService.forcePasswordReset(db, {
@@ -457,7 +466,7 @@ app.post('/admin/users/:id/force-password-reset', requireAuth, async (c) => {
 });
 
 app.get('/admin/audit-log', requireAuth, async (c) => {
-  if (!isPlatformAdmin(c.get('apps'))) return c.json({ error: 'Forbidden.' }, 403);
+  if (!isPlatformAdmin(c)) return c.json({ error: 'Forbidden.' }, 403);
   const db = getDb(c.env, schema);
   const limit = Number(c.req.query('limit')) || undefined;
   const offset = Number(c.req.query('offset')) || undefined;

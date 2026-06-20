@@ -1,0 +1,1 @@
+ALTER TABLE "identity"."users" ADD COLUMN "is_superadmin" boolean DEFAULT false NOT NULL;

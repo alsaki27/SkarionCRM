@@ -89,7 +89,7 @@ export function InvitationsList() {
         </select>
         <input
           type="text"
-          placeholder="Role (e.g. outreach, manager)"
+          placeholder="Role (manager or member)"
           value={role}
           onChange={(e) => setRole(e.target.value)}
           required

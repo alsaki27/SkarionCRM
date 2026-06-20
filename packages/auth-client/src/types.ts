@@ -7,6 +7,7 @@ export interface AccessTokenPayload {
   sub: string;
   email: string;
   apps: AppMembershipsMap;
+  isSuperadmin?: boolean;
   ver: number;
   iat: number;
   exp: number;
