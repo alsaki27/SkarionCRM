@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, cloudflare-platform-rewrite]
   pull_request:
-    branches: [main]
+    branches: [main, cloudflare-platform-rewrite]
 
 jobs:
   ci:
@@ -36,13 +36,6 @@ jobs:
       - name: Build
         run: pnpm build
 
-  # Deploy is a separate job gated on ci passing, only on main, and only once
-  # Cloudflare/Neon credentials are wired as repo secrets. Left as a stub
-  # pending Chunk 1.8 (deployment + secrets) - do not enable until then.
-  # deploy:
-  #   needs: ci
-  #   if: github.ref == 'refs/heads/main'
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - run: echo "wire wrangler deploy + neon migrate here in 1.8"
+  # Deploy is handled by .github/workflows/deploy-identity.yml (ticket 1.8),
+  # a separate workflow scoped to push events on cloudflare-platform-rewrite
+  # only, so it doesn't depend on this job's pass/fail and doesn't block PRs.

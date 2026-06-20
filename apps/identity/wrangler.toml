@@ -1,0 +1,30 @@
+# apps/identity/wrangler.toml
+#
+# Deliberately a DIFFERENT Worker name than Kimi's lift-and-shift deploy
+# (skarion-crm-api on the cloudflare-deploy branch) - both can coexist in
+# the same Cloudflare account during the transition; this one must never
+# overwrite that one.
+name = "skarion-identity"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+# Non-secret config. Secrets (DATABASE_URL, JWT_SECRET, RESEND_API_KEY,
+# MFA_ENCRYPTION_KEY, INVITATION_TOKEN_PEPPER) are set via
+# `wrangler secret put <NAME>` or the deploy workflow - never committed here.
+[vars]
+APP_URL = "https://auth.skarion.com"
+
+[env.staging.vars]
+APP_URL = "https://auth-staging.skarion.com"
+
+# No Hyperdrive binding: Hyperdrive proxies the Postgres wire protocol
+# (TCP), but this Worker uses @neondatabase/serverless's neon-http driver
+# (HTTP fetch to Neon's Data API) per the spec's explicit driver choice -
+# see packages/db-kit/src/client.ts and its README for the full tradeoff.
+# Hyperdrive can't accelerate this transport as configured. Revisit if a
+# TCP-based driver swap ever happens.

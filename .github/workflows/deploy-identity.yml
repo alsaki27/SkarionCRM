@@ -1,0 +1,158 @@
+name: Deploy Identity (Cloudflare)
+
+# Deploys the identity Worker + its two Pages sites (admin, login) on push
+# to this branch. Deliberately scoped to cloudflare-platform-rewrite only -
+# mirrors how Kimi's deploy-to-cloudflare.yml is scoped to cloudflare-deploy
+# only - so neither workflow fires on the other's branch and neither
+# deployment overwrites the other (different Worker/Pages project names
+# too, see apps/identity/wrangler.toml).
+#
+# Secrets used (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, DATABASE_URL,
+# JWT_SECRET) already exist in this repo's secrets, confirmed via Kimi's
+# own deploy-to-cloudflare.yml on the cloudflare-deploy branch. Still
+# missing, add under Settings -> Secrets and variables -> Actions before
+# expecting a full deploy to succeed (the Worker will deploy either way,
+# but email/MFA/invitations will error at runtime without them):
+#   Secrets: RESEND_API_KEY, MFA_ENCRYPTION_KEY, INVITATION_TOKEN_PEPPER
+#   Variables (not secret - it's a public URL): IDENTITY_API_URL,
+#     e.g. https://skarion-identity.<your-subdomain>.workers.dev or
+#     https://auth.skarion.com once the custom domain is attached.
+
+on:
+  push:
+    branches: [cloudflare-platform-rewrite]
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    name: Run identity schema migrations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Apply identity migrations
+        working-directory: apps/identity
+        run: pnpm db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  deploy-worker:
+    name: Deploy identity Worker
+    runs-on: ubuntu-latest
+    needs: [migrate]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @skarion/identity typecheck
+
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/identity
+          command: deploy
+
+      - name: Set DATABASE_URL secret
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/identity
+          command: secret put DATABASE_URL --value "${{ secrets.DATABASE_URL }}"
+      - name: Set JWT_SECRET secret
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/identity
+          command: secret put JWT_SECRET --value "${{ secrets.JWT_SECRET }}"
+      - name: Set RESEND_API_KEY secret
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/identity
+          command: secret put RESEND_API_KEY --value "${{ secrets.RESEND_API_KEY }}"
+      - name: Set MFA_ENCRYPTION_KEY secret
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/identity
+          command: secret put MFA_ENCRYPTION_KEY --value "${{ secrets.MFA_ENCRYPTION_KEY }}"
+      - name: Set INVITATION_TOKEN_PEPPER secret
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/identity
+          command: secret put INVITATION_TOKEN_PEPPER --value "${{ secrets.INVITATION_TOKEN_PEPPER }}"
+
+  deploy-login:
+    name: Deploy public login Pages site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Build
+        working-directory: apps/identity/login
+        run: pnpm build
+        env:
+          VITE_IDENTITY_API_URL: ${{ vars.IDENTITY_API_URL }}
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: skarion-identity-login
+          directory: apps/identity/login/dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-admin:
+    name: Deploy identity admin Pages site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Build
+        working-directory: apps/identity/admin
+        run: pnpm build
+        env:
+          VITE_IDENTITY_API_URL: ${{ vars.IDENTITY_API_URL }}
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: skarion-identity-admin
+          directory: apps/identity/admin/dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
