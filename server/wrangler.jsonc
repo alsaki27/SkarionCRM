@@ -1,0 +1,34 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "skarion-crm-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "vars": {
+    "ENVIRONMENT": "production",
+    "CORS_ORIGIN": "https://skarion-crm.pages.dev"
+  },
+  "triggers": {
+    "crons": ["0 8 * * *", "0 9 * * *", "30 9 * * *", "0 3 * * *"]
+  },
+  "env": {
+    "staging": {
+      "name": "skarion-crm-api-staging",
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "CORS_ORIGIN": "https://skarion-crm-staging.pages.dev"
+      }
+    },
+    "production": {
+      "name": "skarion-crm-api",
+      "vars": {
+        "ENVIRONMENT": "production",
+        "CORS_ORIGIN": "https://skarion-crm.pages.dev"
+      }
+    }
+  }
+}
