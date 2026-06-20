@@ -5,13 +5,27 @@
   "type": "module",
   "main": "./src/index.ts",
   "scripts": {
-    "build": "echo \"(stub) no build yet for @skarion/crm\"",
-    "dev": "echo \"(stub) no dev yet for @skarion/crm\"",
-    "test": "echo \"(stub) no tests yet for @skarion/crm\"",
+    "build": "echo '(stub) no build yet for @skarion/crm'",
+    "dev": "echo '(stub) no dev yet for @skarion/crm'",
+    "test": "echo '(stub) no tests yet for @skarion/crm'",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint . --max-warnings=0"
+    "lint": "eslint . --max-warnings=0",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx ../../packages/db-kit/scripts/migrate-cli.ts --folder=./drizzle"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260620.1",
+    "tsx": "^4.22.4",
     "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "1.1.0",
+    "@skarion/auth-client": "workspace:^",
+    "@skarion/db-kit": "workspace:*",
+    "@skarion/permissions": "workspace:^",
+    "drizzle-orm": "0.45.2",
+    "hono": "^4.12.26",
+    "kysely": "0.29.2",
+    "zod": "^3.25.5"
   }
 }
