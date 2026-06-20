@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { cn } from '../../lib/utils.js';
 import {
   LayoutDashboard, Users, Building2, Contact, Target, CheckSquare, Settings, LogOut,
-  ChevronLeft, ChevronRight, Bell, Search, Menu, X
+  BarChart, ChevronLeft, ChevronRight, Bell, Search, Menu, X
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { icon: Target, label: 'Leads', path: '/leads', roles: ['superadmin', 'manager', 'outreach'] },
   { icon: Contact, label: 'Contacts', path: '/contacts', roles: ['superadmin', 'manager', 'outreach', 'viewer'] },
   { icon: Building2, label: 'Companies', path: '/companies', roles: ['superadmin', 'manager', 'outreach', 'viewer'] },
+  { icon: BarChart, label: 'Pipeline', path: '/pipeline', roles: ['superadmin', 'manager', 'outreach'] },
   { icon: Users, label: 'Opportunities', path: '/opportunities', roles: ['superadmin', 'manager', 'outreach'] },
   { icon: CheckSquare, label: 'Tasks', path: '/tasks', roles: ['superadmin', 'manager', 'outreach'] },
   { icon: Settings, label: 'Settings', path: '/settings', roles: ['superadmin', 'manager'] },

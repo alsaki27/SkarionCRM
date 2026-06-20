@@ -12,6 +12,7 @@ import ContactDetail from './pages/ContactDetail.js';
 import OpportunitiesPage from './pages/OpportunitiesPage.js';
 import OpportunityDetail from './pages/OpportunityDetail.js';
 import TasksPage from './pages/TasksPage.js';
+import PipelinePage from './pages/PipelinePage.js';
 import SettingsPage from './pages/SettingsPage.js';
 
 function Loading() {
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="/contacts/:id" element={<RequireAuth><ContactDetail /></RequireAuth>} />
           <Route path="/opportunities" element={<RequireAuth><OpportunitiesPage /></RequireAuth>} />
           <Route path="/opportunities/:id" element={<RequireAuth><OpportunityDetail /></RequireAuth>} />
+          <Route path="/pipeline" element={<RequireAuth><PipelinePage /></RequireAuth>} />
           <Route path="/tasks" element={<RequireAuth><TasksPage /></RequireAuth>} />
           <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
         </Routes>
