@@ -9,9 +9,6 @@ jobs:
   deploy-api:
     name: Deploy API to Cloudflare Workers
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: server
     steps:
       - uses: actions/checkout@v4
 
@@ -19,13 +16,11 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install dependencies
+      - name: Install dependencies (root workspace)
         run: npm ci
 
-      - name: Build
-        run: npm run build
-        env:
-          NODE_ENV: production
+      - name: Build server
+        run: npm run build:server
 
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
@@ -54,9 +49,6 @@ jobs:
   deploy-frontend:
     name: Deploy Frontend to Cloudflare Pages
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: client
     steps:
       - uses: actions/checkout@v4
 
@@ -64,11 +56,11 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install dependencies
+      - name: Install dependencies (root workspace)
         run: npm ci
 
-      - name: Build
-        run: npm run build
+      - name: Build client
+        run: npm run build:client
         env:
           VITE_API_URL: "${{ secrets.VITE_API_URL }}"
 
@@ -78,8 +70,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: skarion-crm
-          directory: dist
-          workingDirectory: client
+          directory: client/dist
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
   migrate-db:
