@@ -30,6 +30,29 @@ export default function LeadsPage() {
   const deleteMutation = useDeleteEntity();
   const navigate = useNavigate();
 
+  // Debug: log query state to global for inspection
+  useEffect(() => {
+    window.__LEADS_DEBUG = { data, isLoading, hasData: !!data, total: data?.total, leadsCount: data?.leads?.length, timestamp: Date.now() };
+  }, [data, isLoading]);
+
+  // Debug: direct API call to bypass React Query
+  useEffect(() => {
+    (async () => {
+      try {
+        const refresh = await fetch('https://skarion-identity.alsaki1999.workers.dev/auth/refresh', { method: 'POST', credentials: 'include' });
+        const refreshData = await refresh.json();
+        const token = refreshData.access_token;
+        const api = await fetch('https://skarion-crm-platform.alsaki1999.workers.dev/api/leads?page=1&pageSize=50', {
+          headers: { Authorization: 'Bearer ' + token }
+        });
+        const apiData = await api.json();
+        window.__LEADS_DIRECT_API = { ok: api.ok, status: api.status, total: apiData.total, leadsCount: apiData.leads?.length };
+      } catch (e) {
+        window.__LEADS_DIRECT_API = { error: e.message };
+      }
+    })();
+  }, []);
+
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
