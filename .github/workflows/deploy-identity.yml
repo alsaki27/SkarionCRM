@@ -62,6 +62,13 @@ jobs:
       - name: Install wrangler CLI
         run: npm install -g wrangler@3
 
+      - name: Verify Cloudflare API token
+        run: |
+          curl -s -X GET "https://api.cloudflare.com/client/v4/user/tokens/verify" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" | head -c 200
+          echo ""
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       - name: Deploy Worker
         working-directory: apps/identity
         run: wrangler deploy
