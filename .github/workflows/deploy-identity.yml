@@ -131,7 +131,7 @@ jobs:
         working-directory: apps/identity/login
         run: pnpm build
         env:
-          VITE_IDENTITY_API_URL: ${{ vars.IDENTITY_API_URL }}
+          VITE_IDENTITY_API_URL: https://skarion-identity.alsaki1999.workers.dev
       - name: Ensure Pages project exists
         run: |
           curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects" \
@@ -168,7 +168,7 @@ jobs:
         working-directory: apps/identity/admin
         run: pnpm build
         env:
-          VITE_IDENTITY_API_URL: ${{ vars.IDENTITY_API_URL }}
+          VITE_IDENTITY_API_URL: https://skarion-identity.alsaki1999.workers.dev
       - name: Ensure Pages project exists
         run: |
           curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects" \
