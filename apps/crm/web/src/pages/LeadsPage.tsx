@@ -109,7 +109,6 @@ export default function LeadsPage() {
                 <tr key={lead.id} className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer" onClick={() => navigate(`/leads/${lead.id}`)}>
                   <td className="px-4 py-3">
                     <div className="font-medium">{lead.firstName} {lead.lastName}</div>
-                    {lead.title && <div className="text-xs text-slate-500">{lead.title}</div>}
                   </td>
                   <td className="px-4 py-3 text-slate-600">{lead.companyName ?? '—'}</td>
                   <td className="px-4 py-3 text-slate-600">{lead.email.includes('@placeholder.skarion') ? '—' : lead.email}</td>

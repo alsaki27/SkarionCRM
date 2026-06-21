@@ -9,7 +9,7 @@ import { eq, and, isNull, like, sql, desc, asc, or } from "drizzle-orm";
 import type { CrmDb } from "./db/types.js";
 import * as ai from "./lib/ai-service.js";
 import * as docConv from "./lib/document-converter.js";
-import { cleanMarkdownForAi, markdownPreview, estimateTokens } from "./lib/markdown-utils.js";
+import { cleanMarkdownForAi, estimateTokens } from "./lib/markdown-utils.js";
 
 
 interface Env {
@@ -1397,7 +1397,6 @@ app.post("/api/import/leads", async (c) => {
       companyName: row.companyName ?? null,
       companyDomain: row.companyDomain ?? null,
       linkedinUrl: row.linkedinUrl ?? null,
-      title: row.title ?? null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       source: (row.source ?? "other") as any,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -151,7 +151,7 @@ export function parseLeadsCsv(csvText: string): ImportResult<LeadImportRow> {
   const seenLinkedIn = new Set<string>();
   const seenNameCompany = new Set<string>();
 
-  const nameAliases = ['fullname', 'name', 'firstname', 'firstname', 'last name', 'last name', 'first_name', 'last_name'];
+  const _nameAliases = ['fullname', 'name', 'firstname', 'firstname', 'last name', 'last name', 'first_name', 'last_name'];
   const emailAliases = ['email', 'emailaddress', 'email address', 'e-mail'];
   const companyAliases = ['company', 'companyname', 'company name', 'company', 'university', 'school'];
   const linkedInAliases = ['linkedin', 'linkedinurl', 'linkedin profile', 'profileurl', 'profile url', 'profilelink', 'linkedinlink', 'guessedlinkedinurl'];
@@ -260,7 +260,7 @@ export function parseLeadsCsv(csvText: string): ImportResult<LeadImportRow> {
     }
 
     // Build notes from available fields
-    let allNotes = notes;
+    const allNotes = notes;
     const headline = findColumn(row, ['headline', 'head line', 'summary', 'about']);
     const location = findColumn(row, ['location', 'city', 'country']);
     const education = findColumn(row, ['education', 'school', 'university', 'degree']);

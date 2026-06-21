@@ -54,7 +54,7 @@ export function useLeads(page: number = 1, pageSize: number = 50, status?: strin
   qs.append('pageSize', String(pageSize));
   if (status) qs.append('status', status);
   if (search) qs.append('search', search);
-  return useCrmQuery(['leads', page, pageSize, status, search], () =>
+  return useCrmQuery(['leads', String(page), String(pageSize), status ?? '', search ?? ''], () =>
     crmFetch<{ leads: Lead[]; page: number; pageSize: number; total: number; totalPages: number; statusCounts: Record<string, number> }>(`/api/leads?${qs.toString()}`)
   );
 }
