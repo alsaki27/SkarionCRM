@@ -46,7 +46,7 @@ export default function LeadsPage() {
           headers: { Authorization: 'Bearer ' + token }
         });
         const apiData = await api.json();
-        window.__LEADS_DIRECT_API = { ok: api.ok, status: api.status, total: apiData.total, leadsCount: apiData.leads?.length };
+        window.__LEADS_DIRECT_API = { refreshStatus: refresh.status, refreshOk: refresh.ok, tokenExists: !!token, apiOk: api.ok, apiStatus: api.status, total: apiData.total, leadsCount: apiData.leads?.length, error: apiData.error };
       } catch (e) {
         window.__LEADS_DIRECT_API = { error: e.message };
       }
