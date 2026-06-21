@@ -6,7 +6,7 @@ import { cn } from '../lib/utils.js';
 import LeadForm from '../components/forms/LeadForm.js';
 import ImportModal from '../components/ImportModal.js';
 import type { Lead, LeadStatus, OutreachStatus } from '../api.js';
-import { bootstrapAuth } from '../api.js';
+import { bootstrapAuth, crmFetch } from '../api.js';
 
 const PAGE_SIZES = [25, 50, 100, 250];
 
@@ -52,8 +52,17 @@ export default function LeadsPage() {
         });
         const apiData = await api.json();
         window.__LEADS_DIRECT_API = { refreshStatus: refresh.status, refreshOk: refresh.ok, tokenExists: !!token, apiOk: api.ok, apiStatus: api.status, total: apiData.total, leadsCount: apiData.leads?.length, error: apiData.error };
+
+        // Test crmFetch directly
+        try {
+          const crmData = await crmFetch('/api/leads?page=1&pageSize=50');
+          window.__LEADS_CRM_FETCH = { success: true, total: crmData.total, leadsCount: crmData.leads?.length };
+        } catch (crmErr) {
+          window.__LEADS_CRM_FETCH = { success: false, error: crmErr.message, status: crmErr.status || 'N/A' };
+        }
       } catch (e) {
         window.__LEADS_DIRECT_API = { error: e.message };
+        window.__LEADS_CRM_FETCH = { success: false, error: e.message };
       }
     })();
   }, []);
