@@ -125,6 +125,8 @@ jobs:
           node-version: 24
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
+      - name: Install wrangler CLI
+        run: npm install -g wrangler@3
       - name: Build login
         working-directory: apps/identity/login
         run: pnpm build
@@ -168,6 +170,8 @@ jobs:
           node-version: 24
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
+      - name: Install wrangler CLI
+        run: npm install -g wrangler@3
       - name: Build admin
         working-directory: apps/identity/admin
         run: pnpm build
