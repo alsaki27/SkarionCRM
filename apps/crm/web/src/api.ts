@@ -80,14 +80,19 @@ export function redirectToLogin(): void {
 }
 
 export async function crmFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  console.log('[crmFetch] called for path:', path, 'accessToken exists:', !!accessToken);
   if (!accessToken) {
+    console.log('[crmFetch] token missing, refreshing...');
     const refreshed = await refreshAccessToken();
+    console.log('[crmFetch] refresh result:', !!refreshed);
     if (!refreshed) {
+      console.log('[crmFetch] refresh failed, redirecting to login');
       redirectToLogin();
       throw new ApiError('No session.', 401);
     }
   }
 
+  console.log('[crmFetch] making request to:', CRM_API_URL + path);
   let response = await fetch(`${CRM_API_URL}${path}`, {
     ...init,
     headers: {
@@ -98,8 +103,10 @@ export async function crmFetch<T>(path: string, init: RequestInit = {}): Promise
       ...init.headers,
     },
   });
+  console.log('[crmFetch] response status:', response.status);
 
   if (response.status === 401) {
+    console.log('[crmFetch] got 401, refreshing token...');
     const refreshed = await refreshAccessToken();
     if (!refreshed) {
       redirectToLogin();
