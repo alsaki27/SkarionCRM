@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, cloudflare-platform-rewrite]
+    branches: [main]
   pull_request:
-    branches: [main, cloudflare-platform-rewrite]
+    branches: [main]
 
 jobs:
   ci:

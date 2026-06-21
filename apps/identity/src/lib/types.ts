@@ -7,4 +7,8 @@ export interface Env {
   MFA_ENCRYPTION_KEY: string;
   INVITATION_TOKEN_PEPPER: string;
   APP_URL: string;
+  /** Git branch name, set by deploy workflow. Optional for debug endpoints. */
+  GIT_BRANCH?: string;
+  /** Git commit SHA, set by deploy workflow. Optional for debug endpoints. */
+  GIT_COMMIT_SHA?: string;
 }

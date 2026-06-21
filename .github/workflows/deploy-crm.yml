@@ -2,7 +2,7 @@ name: Deploy CRM (Cloudflare)
 
 on:
   push:
-    branches: [main, cloudflare-platform-rewrite]
+    branches: [main]
     paths:
       - 'apps/crm/**'
       - 'packages/permissions/**'

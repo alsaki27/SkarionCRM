@@ -30,6 +30,10 @@ interface Env {
   DOCUMENT_CONVERTER_SECRET?: string;
   /** Max chars to send to AI from converted documents. Default 50000. */
   DOCUMENT_AI_MAX_CHARS?: string;
+  /** Git branch name, set by deploy workflow. Optional for debug endpoints. */
+  GIT_BRANCH?: string;
+  /** Git commit SHA, set by deploy workflow. Optional for debug endpoints. */
+  GIT_COMMIT_SHA?: string;
 }
 
 /** Basic email stub — logs what would be sent. Full Resend wiring in a future ticket. */
@@ -89,6 +93,18 @@ app.use("*", async (c, next) => {
 });
 
 app.get("/health", (c) => c.json({ status: "ok", service: "skarion-crm-platform" }));
+
+app.get("/api/debug/version", (c) => {
+  const branch = c.env.GIT_BRANCH ?? "cloudflare-platform-rewrite";
+  const commit = c.env.GIT_COMMIT_SHA ?? "unknown";
+  return c.json({
+    app: "crm",
+    branch,
+    commit,
+    deployedAt: new Date().toISOString(),
+    environment: "production",
+  });
+});
 
 app.use("/api/*", requireAuth);
 app.use("/api/admin/*", requireSuperadmin());

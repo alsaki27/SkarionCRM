@@ -515,4 +515,16 @@ app.all('/register', (c) => c.json({ error: 'Not found.' }, 404));
 
 app.get('/health', (c) => c.json({ status: 'ok' }));
 
+app.get('/debug/version', (c) => {
+  const branch = c.env.GIT_BRANCH ?? 'main';
+  const commit = c.env.GIT_COMMIT_SHA ?? 'unknown';
+  return c.json({
+    app: 'identity',
+    branch,
+    commit,
+    deployedAt: new Date().toISOString(),
+    environment: 'production',
+  });
+});
+
 export default app;
