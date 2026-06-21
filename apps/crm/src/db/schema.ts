@@ -93,6 +93,13 @@ export const leads = crmSchema.table(
     phone: text("phone"),
     companyName: text("company_name"),
     companyDomain: text("company_domain"),
+    linkedinUrl: text("linkedin_url"),
+    outreachStatus: text("outreach_status").default("not_approached"),
+    approachedAt: timestamp("approached_at", { withTimezone: true }),
+    connectionStatus: text("connection_status"),
+    sourceSheet: text("source_sheet"),
+    originalRowNumber: integer("original_row_number"),
+    tags: jsonb("tags"),
     source: leadSourceEnum("source").default("other").notNull(),
     status: leadStatusEnum("status").default("new").notNull(),
     notes: text("notes"),
@@ -108,6 +115,8 @@ export const leads = crmSchema.table(
     index("idx_leads_source").on(table.source),
     index("idx_leads_owner").on(table.ownerId),
     index("idx_leads_email_lower").on(sql`lower(${table.email})`),
+    index("idx_leads_linkedin").on(table.linkedinUrl),
+    index("idx_leads_outreach").on(table.outreachStatus),
     index("idx_leads_created").on(table.createdAt),
   ]
 );

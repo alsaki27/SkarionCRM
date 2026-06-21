@@ -48,8 +48,15 @@ export function useContacts() {
   return useCrmQuery(['contacts'], () => crmFetch<{ contacts: Contact[] }>('/api/contacts'));
 }
 
-export function useLeads() {
-  return useCrmQuery(['leads'], () => crmFetch<{ leads: Lead[] }>('/api/leads'));
+export function useLeads(page: number = 1, pageSize: number = 50, status?: string, search?: string) {
+  const qs = new URLSearchParams();
+  qs.append('page', String(page));
+  qs.append('pageSize', String(pageSize));
+  if (status) qs.append('status', status);
+  if (search) qs.append('search', search);
+  return useCrmQuery(['leads', page, pageSize, status, search], () =>
+    crmFetch<{ leads: Lead[]; page: number; pageSize: number; total: number; totalPages: number; statusCounts: Record<string, number> }>(`/api/leads?${qs.toString()}`)
+  );
 }
 
 export function useOpportunities() {

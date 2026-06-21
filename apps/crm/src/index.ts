@@ -5,7 +5,7 @@ import { requireAuth, requireSuperadmin, type AuthedVariables } from "@skarion/a
 import { can, canList } from "@skarion/permissions";
 import { parseContactsCsv, parseCompaniesCsv, parseLeadsCsv } from "@skarion/importers";
 import * as schema from "./db/schema.js";
-import { eq, and, isNull, like, sql, desc, asc } from "drizzle-orm";
+import { eq, and, isNull, like, sql, desc, asc, or } from "drizzle-orm";
 import type { CrmDb } from "./db/types.js";
 import * as ai from "./lib/ai-service.js";
 import * as docConv from "./lib/document-converter.js";
@@ -409,7 +409,11 @@ app.get("/api/leads", async (c) => {
   const caller = { userId: c.get("userId"), managedUserIds: undefined, isSuperadmin };
   if (!role) return c.json({ error: "Forbidden." }, 403);
 
+  // Parse query params
+  const page = Math.max(1, parseInt(c.req.query('page') || '1', 10));
+  const pageSize = Math.min(500, Math.max(1, parseInt(c.req.query('pageSize') || '50', 10)));
   const { status, source, search, owner } = c.req.query();
+
   const conditions = [isNull(schema.leads.deletedAt)];
 
   if (!isSuperadmin) {
@@ -419,17 +423,50 @@ app.get("/api/leads", async (c) => {
   if (status) conditions.push(eq(schema.leads.status, status as any));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if (source) conditions.push(eq(schema.leads.source, source as any));
-  if (search) {
-    conditions.push(like(sql`lower(${schema.leads.email})`, `%${search.toLowerCase()}%`));
-  }
   if (owner) conditions.push(eq(schema.leads.ownerId, owner));
 
+  // Search across name, email, company, linkedinUrl
+  if (search) {
+    const searchLower = search.toLowerCase();
+    conditions.push(
+      or(
+        like(sql`lower(${schema.leads.email})`, `%${searchLower}%`),
+        like(sql`lower(${schema.leads.firstName})`, `%${searchLower}%`),
+        like(sql`lower(${schema.leads.lastName})`, `%${searchLower}%`),
+        like(sql`lower(${schema.leads.companyName})`, `%${searchLower}%`),
+        like(sql`lower(${schema.leads.linkedinUrl})`, `%${searchLower}%`),
+      )!
+    );
+  }
+
+  // Get total count
+  const countResult = await db.select({ count: sql<number>`count(*)` }).from(schema.leads).where(and(...conditions));
+  const total = countResult[0]?.count ?? 0;
+
+  // Get paginated rows
   const rows = await db.select().from(schema.leads)
     .where(and(...conditions))
     .orderBy(desc(schema.leads.createdAt))
-    .limit(100);
+    .limit(pageSize)
+    .offset((page - 1) * pageSize);
 
-  return c.json({ leads: rows });
+  // Get status counts (for filters)
+  const statusCountsRaw = await db.select({ status: schema.leads.status, count: sql<number>`count(*)` })
+    .from(schema.leads)
+    .where(and(isNull(schema.leads.deletedAt), ...(!isSuperadmin ? [eq(schema.leads.ownerId, caller.userId)] : [])))
+    .groupBy(schema.leads.status);
+
+  const statusCounts = { new: 0, contacted: 0, qualified: 0, disqualified: 0, converted: 0 };
+  statusCountsRaw.forEach(s => { statusCounts[s.status as keyof typeof statusCounts] = s.count; });
+
+  return c.json({
+    leads: rows,
+    page,
+    pageSize,
+    total,
+    totalPages: Math.ceil(total / pageSize),
+    statusCounts,
+  });
 });
 
 app.post("/api/leads", async (c) => {
@@ -449,6 +486,13 @@ app.post("/api/leads", async (c) => {
     phone: body.phone ?? null,
     companyName: body.companyName ?? null,
     companyDomain: body.companyDomain ?? null,
+    linkedinUrl: body.linkedinUrl ?? null,
+    outreachStatus: body.outreachStatus ?? null,
+    approachedAt: body.approachedAt ? new Date(body.approachedAt) : null,
+    connectionStatus: body.connectionStatus ?? null,
+    sourceSheet: body.sourceSheet ?? null,
+    originalRowNumber: body.originalRowNumber ?? null,
+    tags: body.tags ?? null,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
     source: (body.source ?? "other") as any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -522,6 +566,13 @@ app.put("/api/leads/:id", async (c) => {
   if (body.phone !== undefined) update.phone = body.phone;
   if (body.companyName !== undefined) update.companyName = body.companyName;
   if (body.companyDomain !== undefined) update.companyDomain = body.companyDomain;
+  if (body.linkedinUrl !== undefined) update.linkedinUrl = body.linkedinUrl;
+  if (body.outreachStatus !== undefined) update.outreachStatus = body.outreachStatus;
+  if (body.approachedAt !== undefined) update.approachedAt = body.approachedAt ? new Date(body.approachedAt) : null;
+  if (body.connectionStatus !== undefined) update.connectionStatus = body.connectionStatus;
+  if (body.sourceSheet !== undefined) update.sourceSheet = body.sourceSheet;
+  if (body.originalRowNumber !== undefined) update.originalRowNumber = body.originalRowNumber;
+  if (body.tags !== undefined) update.tags = body.tags;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if (body.source !== undefined) update.source = body.source as any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

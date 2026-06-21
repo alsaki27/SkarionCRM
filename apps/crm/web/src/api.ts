@@ -153,6 +153,7 @@ export interface Contact {
 
 export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'disqualified' | 'converted';
 export type LeadSource = 'website' | 'referral' | 'social_media' | 'cold_call' | 'email_campaign' | 'event' | 'pdf_upload' | 'other';
+export type OutreachStatus = 'not_approached' | 'approached' | 'connected' | 'replied' | 'booked_call' | 'not_interested' | 'bad_fit';
 
 export interface Lead {
   id: string;
@@ -162,6 +163,13 @@ export interface Lead {
   phone: string | null;
   companyName: string | null;
   companyDomain: string | null;
+  linkedinUrl: string | null;
+  outreachStatus: string | null;
+  approachedAt: string | null;
+  connectionStatus: string | null;
+  sourceSheet: string | null;
+  originalRowNumber: number | null;
+  tags: string[] | null;
   source: LeadSource;
   status: LeadStatus;
   notes: string | null;
