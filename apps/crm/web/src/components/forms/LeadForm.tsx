@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useCreateEntity, useUpdateEntity } from '../../hooks/use-api.js';
-import type { Lead, LeadStatus, LeadSource } from '../../api.js';
+import type { Lead, LeadStatus, LeadSource, OutreachStatus } from '../../api.js';
 import Modal from '../ui/Modal.js';
 
 interface LeadFormProps {
@@ -11,6 +11,7 @@ interface LeadFormProps {
 
 const statuses: LeadStatus[] = ['new', 'contacted', 'qualified', 'disqualified', 'converted'];
 const sources: LeadSource[] = ['website', 'referral', 'social_media', 'cold_call', 'email_campaign', 'event', 'other'];
+const outreachStatuses: OutreachStatus[] = ['not_approached', 'approached', 'connected', 'replied', 'booked_call', 'not_interested', 'bad_fit'];
 
 export default function LeadForm({ open, onClose, lead }: LeadFormProps) {
   const create = useCreateEntity('leads');
@@ -24,6 +25,11 @@ export default function LeadForm({ open, onClose, lead }: LeadFormProps) {
     phone: lead?.phone ?? '',
     companyName: lead?.companyName ?? '',
     companyDomain: lead?.companyDomain ?? '',
+    linkedinUrl: lead?.linkedinUrl ?? '',
+    outreachStatus: lead?.outreachStatus ?? 'not_approached',
+    connectionStatus: lead?.connectionStatus ?? '',
+    sourceSheet: lead?.sourceSheet ?? '',
+    originalRowNumber: lead?.originalRowNumber != null ? String(lead.originalRowNumber) : '',
     source: lead?.source ?? 'website',
     status: lead?.status ?? 'new',
     notes: lead?.notes ?? '',
@@ -33,10 +39,12 @@ export default function LeadForm({ open, onClose, lead }: LeadFormProps) {
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
+    const payload: Record<string, unknown> = { ...form };
+    if (form.originalRowNumber) payload.originalRowNumber = parseInt(form.originalRowNumber, 10) || null;
     if (isEdit && lead) {
-      update.mutate({ id: lead.id, data: form }, { onSuccess: onClose });
+      update.mutate({ id: lead.id, data: payload }, { onSuccess: onClose });
     } else {
-      create.mutate(form, { onSuccess: onClose });
+      create.mutate(payload, { onSuccess: onClose });
     }
   };
 
@@ -70,6 +78,32 @@ export default function LeadForm({ open, onClose, lead }: LeadFormProps) {
         <div>
           <label className="block text-sm font-medium text-slate-600 mb-1">Company Domain</label>
           <input value={form.companyDomain} onChange={(e) => handleChange('companyDomain', e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm" placeholder="example.com" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-600 mb-1">LinkedIn URL</label>
+          <input value={form.linkedinUrl} onChange={(e) => handleChange('linkedinUrl', e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm" placeholder="https://linkedin.com/in/..." />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">Outreach Status</label>
+            <select value={form.outreachStatus} onChange={(e) => handleChange('outreachStatus', e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm bg-white">
+              {outreachStatuses.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">Connection Status</label>
+            <input value={form.connectionStatus} onChange={(e) => handleChange('connectionStatus', e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm" placeholder="1st, 2nd, 3rd" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">Source Sheet</label>
+            <input value={form.sourceSheet} onChange={(e) => handleChange('sourceSheet', e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">Original Row #</label>
+            <input type="number" value={form.originalRowNumber} onChange={(e) => handleChange('originalRowNumber', e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm" />
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
