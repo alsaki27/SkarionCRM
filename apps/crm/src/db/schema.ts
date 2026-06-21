@@ -33,7 +33,7 @@ export const activityTypeEnum = crmSchema.enum("activity_type", [
 ]);
 
 export const leadSourceEnum = crmSchema.enum("lead_source", [
-  "website", "referral", "social_media", "cold_call", "email_campaign", "event", "other",
+  "website", "referral", "social_media", "cold_call", "email_campaign", "event", "pdf_upload", "other",
 ]);
 
 export const currencyEnum = crmSchema.enum("currency", [
@@ -93,6 +93,13 @@ export const leads = crmSchema.table(
     phone: text("phone"),
     companyName: text("company_name"),
     companyDomain: text("company_domain"),
+    linkedinUrl: text("linkedin_url"),
+    outreachStatus: text("outreach_status").default("not_approached"),
+    approachedAt: timestamp("approached_at", { withTimezone: true }),
+    connectionStatus: text("connection_status"),
+    sourceSheet: text("source_sheet"),
+    originalRowNumber: integer("original_row_number"),
+    tags: jsonb("tags"),
     source: leadSourceEnum("source").default("other").notNull(),
     status: leadStatusEnum("status").default("new").notNull(),
     notes: text("notes"),
@@ -108,6 +115,8 @@ export const leads = crmSchema.table(
     index("idx_leads_source").on(table.source),
     index("idx_leads_owner").on(table.ownerId),
     index("idx_leads_email_lower").on(sql`lower(${table.email})`),
+    index("idx_leads_linkedin").on(table.linkedinUrl),
+    index("idx_leads_outreach").on(table.outreachStatus),
     index("idx_leads_created").on(table.createdAt),
   ]
 );
@@ -337,3 +346,42 @@ export const chatMessages = crmSchema.table(
 
 export const embeddingsRelations = relations(embeddings, () => ({}));
 export const chatMessagesRelations = relations(chatMessages, () => ({}));
+
+
+// ─────────────────────────────────────────────────────────
+// document_imports (conversion tracking for PDF/DOCX/etc imports)
+// ─────────────────────────────────────────────────────────
+export const documentImportStatusEnum = crmSchema.enum("document_import_status", [
+  "pending", "converted", "failed", "linked",
+]);
+
+export const documentImports = crmSchema.table(
+  "document_imports",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    fileHash: text("file_hash").notNull(), // sha256 of uploaded file
+    originalFilename: text("original_filename").notNull(),
+    mimeType: text("mime_type").notNull(),
+    source: leadSourceEnum("source").default("other").notNull(), // pdf_upload, etc.
+    markdownPreview: text("markdown_preview"), // first 2000 chars of converted markdown
+    conversionStatus: documentImportStatusEnum("conversion_status").default("pending").notNull(),
+    conversionWarnings: jsonb("conversion_warnings"), // array of warning strings
+    estimatedTokens: integer("estimated_tokens"),
+    charCount: integer("char_count"),
+    usedFallback: boolean("used_fallback").default(false).notNull(), // true if local extractor was used
+    fallbackReason: text("fallback_reason"), // why fallback was used
+    leadId: uuid("lead_id"), // set when linked to a confirmed lead
+    ownerId: uuid("owner_id").notNull(),
+    ...timestamps(),
+  },
+  (table) => [
+    index("idx_document_imports_hash").on(table.fileHash),
+    index("idx_document_imports_lead").on(table.leadId),
+    index("idx_document_imports_owner").on(table.ownerId),
+    index("idx_document_imports_status").on(table.conversionStatus),
+  ]
+);
+
+export const documentImportsRelations = relations(documentImports, ({ one }) => ({
+  lead: one(leads, { fields: [documentImports.leadId], references: [leads.id] }),
+}));

@@ -1,44 +1,45 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLeads, useDeleteEntity } from '../hooks/use-api.js';
 import { useNavigate } from 'react-router-dom';
-import { Target, Plus, Search, Trash2, ArrowRight, Pencil, Upload, FileText } from 'lucide-react';
+import { Target, Plus, Search, Trash2, ArrowRight, Pencil, Upload, Linkedin, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../lib/utils.js';
 import LeadForm from '../components/forms/LeadForm.js';
 import ImportModal from '../components/ImportModal.js';
-import PdfImportModal from '../components/PdfImportModal.js';
-import type { Lead } from '../api.js';
+import type { Lead, LeadStatus } from '../api.js';
 
 export default function LeadsPage() {
-  const { data, isLoading } = useLeads();
-  const deleteMutation = useDeleteEntity();
-  const navigate = useNavigate();
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filter, setFilter] = useState<'all' | LeadStatus>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [pdfImportOpen, setPdfImportOpen] = useState(false);
   const [editLead, setEditLead] = useState<Lead | null>(null);
+
+  const { data, isLoading } = useLeads(page, pageSize, filter === 'all' ? undefined : filter, debouncedSearch || undefined);
+  const deleteMutation = useDeleteEntity();
+  const navigate = useNavigate();
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Reset to page 1 when filter or search changes
+  useEffect(() => {
+    setPage(1);
+  }, [filter, debouncedSearch]);
 
   const openCreate = () => { setEditLead(null); setModalOpen(true); };
   const openEdit = (lead: Lead) => { setEditLead(lead); setModalOpen(true); };
   const closeModal = () => { setModalOpen(false); setEditLead(null); };
 
-  const leads = data?.leads.filter((l) => !l.deletedAt) ?? [];
-  const filtered = leads.filter((l) => {
-    const matchesSearch = !search || l.email.toLowerCase().includes(search.toLowerCase()) ||
-      `${l.firstName} ${l.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
-      (l.companyName ?? '').toLowerCase().includes(search.toLowerCase());
-    const matchesFilter = filter === 'all' || l.status === filter;
-    return matchesSearch && matchesFilter;
-  });
-
-  const statusCounts = {
-    new: leads.filter(l => l.status === 'new').length,
-    contacted: leads.filter(l => l.status === 'contacted').length,
-    qualified: leads.filter(l => l.status === 'qualified').length,
-    disqualified: leads.filter(l => l.status === 'disqualified').length,
-    converted: leads.filter(l => l.status === 'converted').length,
-  };
+  const leads = data?.leads ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
+  const statusCounts = data?.statusCounts ?? { new: 0, contacted: 0, qualified: 0, disqualified: 0, converted: 0 };
 
   if (isLoading) return <div className="text-slate-500">Loading leads...</div>;
 
@@ -48,12 +49,9 @@ export default function LeadsPage() {
         <div className="flex items-center gap-2">
           <Target size={20} className="text-slate-600" />
           <h1 className="text-xl font-semibold">Leads</h1>
-          <span className="text-sm text-slate-500">({filtered.length})</span>
+          <span className="text-sm text-slate-500">({total} total)</span>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setPdfImportOpen(true)} className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-md text-sm hover:bg-slate-50 text-slate-600">
-            <FileText size={16} /> Add Lead from PDF
-          </button>
           <button onClick={() => setImportOpen(true)} className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-md text-sm hover:bg-slate-50 text-slate-600">
             <Upload size={16} /> CSV Import
           </button>
@@ -68,7 +66,7 @@ export default function LeadsPage() {
           onClick={() => setFilter('all')}
           className={cn('px-3 py-1.5 rounded-md text-sm border', filter === 'all' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white border-slate-200 hover:bg-slate-50')}
         >
-          All ({leads.length})
+          All ({total})
         </button>
         {(Object.keys(statusCounts) as LeadStatus[]).map((s) => (
           <button
@@ -76,7 +74,7 @@ export default function LeadsPage() {
             onClick={() => setFilter(s)}
             className={cn('px-3 py-1.5 rounded-md text-sm border capitalize', filter === s ? 'bg-slate-900 text-white border-slate-900' : 'bg-white border-slate-200 hover:bg-slate-50')}
           >
-            {s} ({statusCounts[s]})
+            {s} ({statusCounts[s] || 0})
           </button>
         ))}
       </div>
@@ -85,7 +83,7 @@ export default function LeadsPage() {
         <Search size={16} className="text-slate-400" />
         <input
           type="text"
-          placeholder="Search leads..."
+          placeholder="Search by name, email, company, LinkedIn..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="flex-1 text-sm outline-none"
@@ -100,19 +98,39 @@ export default function LeadsPage() {
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Name</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Company</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Email</th>
+                <th className="text-left px-4 py-3 font-medium text-slate-600">LinkedIn</th>
+                <th className="text-left px-4 py-3 font-medium text-slate-600">Outreach</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Status</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-600">Source</th>
                 <th className="text-right px-4 py-3 font-medium text-slate-600">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((lead) => (
+              {leads.map((lead) => (
                 <tr key={lead.id} className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer" onClick={() => navigate(`/leads/${lead.id}`)}>
                   <td className="px-4 py-3">
                     <div className="font-medium">{lead.firstName} {lead.lastName}</div>
                   </td>
                   <td className="px-4 py-3 text-slate-600">{lead.companyName ?? '—'}</td>
-                  <td className="px-4 py-3 text-slate-600">{lead.email}</td>
+                  <td className="px-4 py-3 text-slate-600">{lead.email.includes('@placeholder.skarion') ? '—' : lead.email}</td>
+                  <td className="px-4 py-3">
+                    {lead.linkedinUrl ? (
+                      <a href={lead.linkedinUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-blue-600 hover:text-blue-800">
+                        <Linkedin size={16} />
+                      </a>
+                    ) : '—'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={cn('px-2 py-0.5 rounded text-xs font-medium',
+                      lead.outreachStatus === 'not_approached' ? 'bg-slate-100 text-slate-600' :
+                      lead.outreachStatus === 'approached' ? 'bg-amber-100 text-amber-700' :
+                      lead.outreachStatus === 'connected' ? 'bg-blue-100 text-blue-700' :
+                      lead.outreachStatus === 'replied' ? 'bg-green-100 text-green-700' :
+                      lead.outreachStatus === 'booked_call' ? 'bg-purple-100 text-purple-700' :
+                      'bg-slate-100 text-slate-600'
+                    )}>
+                      {lead.outreachStatus?.replace('_', ' ') ?? 'not approached'}
+                    </span>
+                  </td>
                   <td className="px-4 py-3">
                     <span className={cn('px-2 py-0.5 rounded text-xs font-medium',
                       lead.status === 'new' ? 'bg-blue-100 text-blue-700' :
@@ -124,38 +142,53 @@ export default function LeadsPage() {
                       {lead.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-slate-600 capitalize">{lead.source.replace('_', ' ')}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openEdit(lead); }}
-                        className="p-1.5 rounded hover:bg-slate-200 text-slate-500"
-                      >
+                      <button onClick={(e) => { e.stopPropagation(); openEdit(lead); }} className="p-1.5 rounded hover:bg-slate-200 text-slate-500">
                         <Pencil size={14} />
                       </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); navigate(`/leads/${lead.id}`); }}
-                        className="p-1.5 rounded hover:bg-slate-200 text-slate-500"
-                      >
+                      <button onClick={(e) => { e.stopPropagation(); navigate(`/leads/${lead.id}`); }} className="p-1.5 rounded hover:bg-slate-200 text-slate-500">
                         <ArrowRight size={14} />
                       </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); deleteMutation.mutate({ type: 'leads', id: lead.id }); }}
-                        className="p-1.5 rounded hover:bg-red-100 text-red-500"
-                      >
+                      <button onClick={(e) => { e.stopPropagation(); deleteMutation.mutate({ type: 'leads', id: lead.id }); }} className="p-1.5 rounded hover:bg-red-100 text-red-500">
                         <Trash2 size={14} />
                       </button>
                     </div>
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-400">No leads found</td></tr>
+              {leads.length === 0 && (
+                <tr><td colSpan={7} className="px-4 py-12 text-center text-slate-400">No leads found</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-2">
+          <div className="text-sm text-slate-500">
+            Page {page} of {totalPages} ({total} total)
+          </div>
+          <div className="flex gap-1">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="px-3 py-1.5 border border-slate-200 rounded-md text-sm hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="px-3 py-1.5 border border-slate-200 rounded-md text-sm hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       <LeadForm open={modalOpen} onClose={closeModal} lead={editLead} />
       <ImportModal
@@ -163,13 +196,10 @@ export default function LeadsPage() {
         onClose={() => setImportOpen(false)}
         type="leads"
         title="Leads"
-        sampleCsv={`firstName,lastName,email,phone,companyName,companyDomain,source
-John,Doe,john@acme.com,+1-555-1234,Acme Inc,acme.com,website
-Jane,Smith,jane@globex.org,+1-555-5678,Globex Corp,globex.org,referral`}
+        sampleCsv={`firstName,lastName,email,phone,companyName,companyDomain,linkedinUrl,title,source,status,notes
+John,Doe,john@acme.com,+1-555-1234,Acme Inc,acme.com,https://linkedin.com/in/johndoe,Manager,website,new,Interested in OSP support
+Jane,Smith,jane@globex.org,+1-555-5678,Globex Corp,globex.org,https://linkedin.com/in/janesmith,Director,referral,contacted,Referred by Bob`}
       />
-      <PdfImportModal open={pdfImportOpen} onClose={() => setPdfImportOpen(false)} />
     </div>
   );
 }
-
-type LeadStatus = 'new' | 'contacted' | 'qualified' | 'disqualified' | 'converted';

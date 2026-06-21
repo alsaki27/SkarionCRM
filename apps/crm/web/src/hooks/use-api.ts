@@ -48,8 +48,15 @@ export function useContacts() {
   return useCrmQuery(['contacts'], () => crmFetch<{ contacts: Contact[] }>('/api/contacts'));
 }
 
-export function useLeads() {
-  return useCrmQuery(['leads'], () => crmFetch<{ leads: Lead[] }>('/api/leads'));
+export function useLeads(page: number = 1, pageSize: number = 50, status?: string, search?: string) {
+  const qs = new URLSearchParams();
+  qs.append('page', String(page));
+  qs.append('pageSize', String(pageSize));
+  if (status) qs.append('status', status);
+  if (search) qs.append('search', search);
+  return useCrmQuery(['leads', String(page), String(pageSize), status ?? '', search ?? ''], () =>
+    crmFetch<{ leads: Lead[]; page: number; pageSize: number; total: number; totalPages: number; statusCounts: Record<string, number> }>(`/api/leads?${qs.toString()}`)
+  );
 }
 
 export function useOpportunities() {
@@ -177,7 +184,7 @@ export function useSummarizeContact(id: string) {
 
 // ─── PDF IMPORT ───
 
-export interface PdfImportResult {
+export interface DocumentImportResult {
   draftLead: {
     leadType: string;
     firstName: string;
@@ -200,12 +207,21 @@ export interface PdfImportResult {
   };
   duplicates: { id: string; firstName: string; lastName: string; email: string; phone: string | null }[];
   rawTextPreview: string;
+  markdownPreview?: string;
+  conversionWarnings?: string[];
+  estimatedTokens?: number;
+  charCount?: number;
+  usedFallback?: boolean;
+  fallbackReason?: string | null;
 }
 
-export function useImportPdf() {
+/** @deprecated Use DocumentImportResult instead */
+export type PdfImportResult = DocumentImportResult;
+
+export function useImportDocument() {
   return useMutation({
     mutationFn: async (formData: FormData) => {
-      return crmFetch<PdfImportResult>('/api/leads/import/pdf', {
+      return crmFetch<DocumentImportResult>('/api/leads/import/document', {
         method: 'POST',
         body: formData,
       });
@@ -213,11 +229,11 @@ export function useImportPdf() {
   });
 }
 
-export function useConfirmPdfImport() {
+export function useConfirmDocumentImport() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: { lead: Record<string, unknown>; force?: boolean; createCompany?: boolean; createContact?: boolean }) => {
-      return crmFetch<{ lead: Lead; contactId: string | null; companyId: string | null }>('/api/leads/import/pdf/confirm', {
+      return crmFetch<{ lead: Lead; contactId: string | null; companyId: string | null }>('/api/leads/import/document/confirm', {
         method: 'POST',
         body: JSON.stringify(data),
       });
@@ -228,6 +244,17 @@ export function useConfirmPdfImport() {
       qc.invalidateQueries({ queryKey: ['companies'] });
     },
   });
+}
+
+// Keep old exports for backward compatibility (they redirect to the new endpoints)
+/** @deprecated Use useImportDocument instead */
+export function useImportPdf() {
+  return useImportDocument();
+}
+
+/** @deprecated Use useConfirmDocumentImport instead */
+export function useConfirmPdfImport() {
+  return useConfirmDocumentImport();
 }
 
 export function useChatHistory() {

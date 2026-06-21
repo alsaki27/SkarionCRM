@@ -2,7 +2,7 @@ name: Deploy CRM (Cloudflare)
 
 on:
   push:
-    branches: [main]
+    branches: [main, cloudflare-platform-rewrite]
     paths:
       - 'apps/crm/**'
       - 'packages/permissions/**'
@@ -26,7 +26,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: cd apps/crm && pnpm db:migrate
@@ -42,55 +42,106 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @skarion/crm typecheck
-      - uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/crm
-          command: deploy
+      - name: Install wrangler CLI
+        run: npm install -g wrangler@3
+
+      - name: Deploy CRM Worker
+        working-directory: apps/crm
+        run: wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Set DATABASE_URL secret
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/crm
-          command: secret put DATABASE_URL --value "${{ secrets.DATABASE_URL }}"
+        working-directory: apps/crm
+        run: printf '%s' "$DATABASE_URL" | wrangler secret put DATABASE_URL
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - name: Set JWT_SECRET secret
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/crm
-          command: secret put JWT_SECRET --value "${{ secrets.JWT_SECRET }}"
+        working-directory: apps/crm
+        run: printf '%s' "$JWT_SECRET" | wrangler secret put JWT_SECRET
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
       - name: Set GOOGLE_API_KEY secret
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/crm
-          command: secret put GOOGLE_API_KEY --value "${{ secrets.GOOGLE_API_KEY }}"
+        working-directory: apps/crm
+        run: printf '%s' "$GOOGLE_API_KEY" | wrangler secret put GOOGLE_API_KEY
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
       - name: Set GOOGLE_CHAT_MODEL secret
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/crm
-          command: secret put GOOGLE_CHAT_MODEL --value "${{ secrets.GOOGLE_CHAT_MODEL }}"
+        working-directory: apps/crm
+        run: printf '%s' "$GOOGLE_CHAT_MODEL" | wrangler secret put GOOGLE_CHAT_MODEL
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GOOGLE_CHAT_MODEL: ${{ secrets.GOOGLE_CHAT_MODEL }}
       - name: Set GOOGLE_EMBEDDING_MODEL secret
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/crm
-          command: secret put GOOGLE_EMBEDDING_MODEL --value "${{ secrets.GOOGLE_EMBEDDING_MODEL }}"
+        working-directory: apps/crm
+        run: |
+          if [ -n "$GOOGLE_EMBEDDING_MODEL" ]; then
+            printf '%s' "$GOOGLE_EMBEDDING_MODEL" | wrangler secret put GOOGLE_EMBEDDING_MODEL
+          else
+            echo "GOOGLE_EMBEDDING_MODEL not set, skipping"
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GOOGLE_EMBEDDING_MODEL: ${{ secrets.GOOGLE_EMBEDDING_MODEL }}
+      - name: Set DOCUMENT_CONVERTER_SECRET secret
+        working-directory: apps/crm
+        run: |
+          if [ -n "$DOCUMENT_CONVERTER_SECRET" ]; then
+            printf '%s' "$DOCUMENT_CONVERTER_SECRET" | wrangler secret put DOCUMENT_CONVERTER_SECRET
+          else
+            echo "DOCUMENT_CONVERTER_SECRET not set, skipping"
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DOCUMENT_CONVERTER_SECRET: ${{ secrets.DOCUMENT_CONVERTER_SECRET }}
 
   # CRM Pages is deployed via Cloudflare's GitHub integration (auto-build on push).
   # Project: skarion-crm | Branch: main | Root: apps/crm/web
   # Required Pages env vars (set in Cloudflare dashboard):
   #   VITE_API_URL=https://skarion-crm-platform.alsaki1999.workers.dev
   #   VITE_IDENTITY_API_URL=https://skarion-identity.alsaki1999.workers.dev
+  #   VITE_IDENTITY_LOGIN_URL=https://skarion-identity-login.pages.dev
+  #
+  # NOTE: We now ALSO deploy via workflow to ensure correct env vars.
+
+  deploy-pages:
+    name: Deploy CRM Pages site
+    needs: deploy-worker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install wrangler CLI
+        run: npm install -g wrangler@3
+      - name: Build CRM Pages
+        working-directory: apps/crm/web
+        run: pnpm build
+        env:
+          VITE_API_URL: https://skarion-crm-platform.alsaki1999.workers.dev
+          VITE_IDENTITY_API_URL: https://skarion-identity.alsaki1999.workers.dev
+          VITE_IDENTITY_LOGIN_URL: https://skarion-identity-login.pages.dev
+      - name: Deploy to Cloudflare Pages
+        working-directory: apps/crm/web
+        run: wrangler pages deploy dist --project-name=skarion-crm --branch=main
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

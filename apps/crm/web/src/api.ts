@@ -16,7 +16,7 @@ export const CRM_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:878
 export const IDENTITY_API_URL = import.meta.env.VITE_IDENTITY_API_URL || 'https://skarion-identity.alsaki1999.workers.dev';
 // The login page is a separate Pages site (not the Worker API). Separate env var so
 // the redirect goes to the right place while API calls still hit the worker.
-export const IDENTITY_LOGIN_URL = import.meta.env.VITE_IDENTITY_LOGIN_URL || IDENTITY_API_URL;
+export const IDENTITY_LOGIN_URL = import.meta.env.VITE_IDENTITY_LOGIN_URL || 'https://skarion-identity-login.pages.dev';
 
 
 let accessToken: string | null = null;
@@ -91,7 +91,9 @@ export async function crmFetch<T>(path: string, init: RequestInit = {}): Promise
   let response = await fetch(`${CRM_API_URL}${path}`, {
     ...init,
     headers: {
-      'Content-Type': 'application/json',
+      ...(init.body instanceof FormData
+        ? {}
+        : { 'Content-Type': 'application/json' }),
       Authorization: `Bearer ${accessToken}`,
       ...init.headers,
     },
@@ -106,7 +108,9 @@ export async function crmFetch<T>(path: string, init: RequestInit = {}): Promise
     response = await fetch(`${CRM_API_URL}${path}`, {
       ...init,
       headers: {
-        'Content-Type': 'application/json',
+        ...(init.body instanceof FormData
+          ? {}
+          : { 'Content-Type': 'application/json' }),
         Authorization: `Bearer ${accessToken}`,
         ...init.headers,
       },
@@ -148,7 +152,8 @@ export interface Contact {
 }
 
 export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'disqualified' | 'converted';
-export type LeadSource = 'website' | 'referral' | 'social_media' | 'cold_call' | 'email_campaign' | 'event' | 'other';
+export type LeadSource = 'website' | 'referral' | 'social_media' | 'cold_call' | 'email_campaign' | 'event' | 'pdf_upload' | 'other';
+export type OutreachStatus = 'not_approached' | 'approached' | 'connected' | 'replied' | 'booked_call' | 'not_interested' | 'bad_fit';
 
 export interface Lead {
   id: string;
@@ -158,6 +163,13 @@ export interface Lead {
   phone: string | null;
   companyName: string | null;
   companyDomain: string | null;
+  linkedinUrl: string | null;
+  outreachStatus: string | null;
+  approachedAt: string | null;
+  connectionStatus: string | null;
+  sourceSheet: string | null;
+  originalRowNumber: number | null;
+  tags: string[] | null;
   source: LeadSource;
   status: LeadStatus;
   notes: string | null;
