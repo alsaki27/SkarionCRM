@@ -56,9 +56,9 @@ export default function LeadsPage() {
         // Test crmFetch directly
         try {
           const crmData = await crmFetch('/api/leads?page=1&pageSize=50');
-          window.__LEADS_CRM_FETCH = { success: true, total: crmData.total, leadsCount: crmData.leads?.length };
+          window.__LEADS_CRM_FETCH = { success: true, total: crmData.total, leadsCount: crmData.leads?.length, url: window.__CRM_FETCH_DEBUG?.url };
         } catch (crmErr) {
-          window.__LEADS_CRM_FETCH = { success: false, error: crmErr.message, status: crmErr.status || 'N/A' };
+          window.__LEADS_CRM_FETCH = { success: false, error: crmErr.message, status: crmErr.status || 'N/A', url: window.__CRM_FETCH_DEBUG?.url };
         }
       } catch (e) {
         window.__LEADS_DIRECT_API = { error: e.message };

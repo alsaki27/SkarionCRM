@@ -97,7 +97,8 @@ export async function crmFetch<T>(path: string, init: RequestInit = {}): Promise
     ...init.headers,
   };
   // Debug: log crmFetch attempt
-  (window as any).__CRM_FETCH_DEBUG = { url, accessTokenExists: !!accessToken, headers: Object.keys(headers) };
+  (window as any).__CRM_FETCH_DEBUG = (window as any).__CRM_FETCH_DEBUG || [];
+  (window as any).__CRM_FETCH_DEBUG.push({ path, url, accessTokenExists: !!accessToken, headers: Object.keys(headers) });
 
   let response;
   try {
@@ -106,8 +107,11 @@ export async function crmFetch<T>(path: string, init: RequestInit = {}): Promise
       headers,
     });
   } catch (fetchErr: any) {
-    (window as any).__CRM_FETCH_DEBUG.error = fetchErr.message;
-    (window as any).__CRM_FETCH_DEBUG.errorType = fetchErr.name;
+    const lastDebug = (window as any).__CRM_FETCH_DEBUG?.[(window as any).__CRM_FETCH_DEBUG.length - 1];
+    if (lastDebug) {
+      lastDebug.error = fetchErr.message;
+      lastDebug.errorType = fetchErr.name;
+    }
     throw fetchErr;
   }
 
