@@ -655,6 +655,71 @@ app.delete("/api/leads/:id", async (c) => {
   return c.json({ success: true });
 });
 
+// ─── LEAD EXPORT ─────────────────────────────────────────────
+
+function escapeCsv(val: unknown): string {
+  const s = String(val ?? '');
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+app.get("/api/leads/export.csv", async (c) => {
+  const db = getDb(c.env, schema) as CrmDb;
+  const role = getRole(c);
+  const isSuperadmin = c.get("isSuperadmin");
+  const caller = { userId: c.get("userId"), isSuperadmin };
+  if (!role) return c.json({ error: "Forbidden." }, 403);
+
+  const { status, source, search, outreachStatus } = c.req.query();
+
+  const conditions = [isNull(schema.leads.deletedAt)];
+  if (!isSuperadmin) conditions.push(eq(schema.leads.ownerId, caller.userId));
+  if (status) conditions.push(eq(schema.leads.status, status as any)); // eslint-disable-line @typescript-eslint/no-explicit-any
+  if (source) conditions.push(eq(schema.leads.source, source as any)); // eslint-disable-line @typescript-eslint/no-explicit-any
+  if (outreachStatus) conditions.push(eq(schema.leads.outreachStatus, outreachStatus));
+
+  if (search) {
+    const searchLower = search.toLowerCase();
+    conditions.push(
+      or(
+        like(sql`lower(${schema.leads.email})`, `%${searchLower}%`),
+        like(sql`lower(${schema.leads.firstName})`, `%${searchLower}%`),
+        like(sql`lower(${schema.leads.lastName})`, `%${searchLower}%`),
+        like(sql`lower(${schema.leads.companyName})`, `%${searchLower}%`),
+        like(sql`lower(${schema.leads.linkedinUrl})`, `%${searchLower}%`),
+      )!
+    );
+  }
+
+  const rows = await db.select().from(schema.leads)
+    .where(and(...conditions))
+    .orderBy(desc(schema.leads.createdAt));
+
+  const headers = [
+    'firstName', 'lastName', 'email', 'phone', 'companyName', 'companyDomain',
+    'linkedinUrl', 'status', 'source', 'outreachStatus', 'approachedAt',
+    'connectionStatus', 'sourceSheet', 'originalRowNumber', 'notes', 'createdAt', 'updatedAt'
+  ];
+
+  let csv = headers.map(escapeCsv).join(',') + '\n';
+  for (const row of rows) {
+    csv += [
+      row.firstName, row.lastName, row.email, row.phone, row.companyName, row.companyDomain,
+      row.linkedinUrl, row.status, row.source, row.outreachStatus,
+      row.approachedAt ? new Date(row.approachedAt).toISOString() : '',
+      row.connectionStatus, row.sourceSheet, row.originalRowNumber,
+      row.notes, row.createdAt ? new Date(row.createdAt).toISOString() : '',
+      row.updatedAt ? new Date(row.updatedAt).toISOString() : ''
+    ].map(escapeCsv).join(',') + '\n';
+  }
+
+  c.header('Content-Type', 'text/csv; charset=utf-8');
+  c.header('Content-Disposition', 'attachment; filename="skarion-leads.csv"');
+  return c.body(csv);
+});
+
 app.post("/api/leads/:id/convert", async (c) => {
   const db = getDb(c.env, schema) as CrmDb;
   const id = c.req.param("id");

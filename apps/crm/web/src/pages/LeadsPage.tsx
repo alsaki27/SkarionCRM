@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLeads, useDeleteEntity } from '../hooks/use-api.js';
 import { useNavigate } from 'react-router-dom';
-import { Target, Plus, Search, Trash2, ArrowRight, Pencil, Upload, Linkedin, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Target, Plus, Search, Trash2, ArrowRight, Pencil, Upload, Linkedin, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { cn } from '../lib/utils.js';
 import LeadForm from '../components/forms/LeadForm.js';
 import ImportModal from '../components/ImportModal.js';
@@ -45,6 +45,28 @@ export default function LeadsPage() {
   const openEdit = (lead: Lead) => { setEditLead(lead); setModalOpen(true); };
   const closeModal = () => { setModalOpen(false); setEditLead(null); };
 
+  const handleExport = async () => {
+    const qs = new URLSearchParams();
+    if (statusFilter !== 'all') qs.append('status', statusFilter);
+    if (outreachFilter !== 'all') qs.append('outreachStatus', outreachFilter);
+    if (debouncedSearch) qs.append('search', debouncedSearch);
+    const url = `${import.meta.env.VITE_API_URL}/api/leads/export.csv?${qs.toString()}`;
+    const token = localStorage.getItem('access_token');
+    const res = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      alert('Export failed');
+      return;
+    }
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'skarion-leads.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
   const leads = data?.leads ?? [];
   const total = data?.total ?? 0;
   const totalPages = data?.totalPages ?? 1;
@@ -62,6 +84,9 @@ export default function LeadsPage() {
           <span className="text-sm text-slate-500">({total} total)</span>
         </div>
         <div className="flex gap-2">
+          <button onClick={handleExport} className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-md text-sm hover:bg-slate-50 text-slate-600">
+            <Download size={16} /> Export CSV
+          </button>
           <button onClick={() => setImportOpen(true)} className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-md text-sm hover:bg-slate-50 text-slate-600">
             <Upload size={16} /> CSV Import
           </button>
