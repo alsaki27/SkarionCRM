@@ -1,0 +1,24 @@
+name: Seed Admin User
+
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Seed admin user
+        working-directory: apps/identity
+        run: npx tsx src/scripts/seed-admin.ts
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ADMIN_EMAIL: admin@skarion.com
+          ADMIN_PASSWORD: changeme-now
+          ADMIN_NAME: System Admin
