@@ -3,6 +3,7 @@ packages:
   - 'apps/identity/admin'
   - 'apps/identity/login'
   - 'apps/crm/web'
+  - 'apps/accounting/web'
   - 'apps/workers/*'
   - 'packages/*'
 

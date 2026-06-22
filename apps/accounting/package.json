@@ -4,14 +4,34 @@
   "version": "0.1.0",
   "type": "module",
   "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./db/schema": "./src/db/schema.ts",
+    "./db/types": "./src/db/types.ts"
+  },
   "scripts": {
-    "build": "echo \"(stub) no build yet for @skarion/accounting\"",
-    "dev": "echo \"(stub) no dev yet for @skarion/accounting\"",
-    "test": "echo \"(stub) no tests yet for @skarion/accounting\"",
+    "build": "echo '(stub) no build yet for @skarion/accounting'",
+    "dev": "echo '(stub) no dev yet for @skarion/accounting'",
+    "test": "echo '(stub) no tests yet for @skarion/accounting'",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint . --max-warnings=0"
+    "lint": "eslint . --max-warnings=0",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx ../../packages/db-kit/scripts/migrate-cli.ts --folder=./drizzle"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260620.1",
+    "drizzle-kit": "0.30.6",
+    "tsx": "^4.22.4",
     "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "1.1.0",
+    "@skarion/auth-client": "workspace:^",
+    "@skarion/db-kit": "workspace:*",
+    "@skarion/permissions": "workspace:^",
+    "drizzle-orm": "0.45.2",
+    "hono": "^4.12.26",
+    "kysely": "0.29.2",
+    "zod": "^3.25.5"
   }
 }

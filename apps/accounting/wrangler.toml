@@ -1,0 +1,14 @@
+name = "skarion-books-platform"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[vars]
+APP_URL = "https://skarion-books.pages.dev"
+
+[env.staging.vars]
+APP_URL = "https://skarion-books-staging.pages.dev"

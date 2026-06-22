@@ -1,4 +1,6 @@
-// apps/crm/web/src/api.ts
+import type { BooksRole } from './stores/auth.js';
+
+// apps/accounting/web/src/api.ts
 // Access token kept in memory only (never localStorage - it's a 15-minute
 // JWT and localStorage is readable by any script on the page, which turns
 // one XSS bug into a stolen-session bug). Refreshed via identity's httpOnly
@@ -12,12 +14,12 @@
 // rather than introducing a new, unconfigured one. Identity's URL is also
 // env-configurable via VITE_IDENTITY_API_URL so it can be changed in one
 // place (dashboard env var or local .env) without a grep-and-replace.
-const _CRM_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8788';
+const _BOOKS_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
 // Guard against misconfigured Pages dashboard env vars where VITE_API_URL
-// may accidentally be set to the identity/login URL instead of the CRM API.
-export const CRM_API_URL = _CRM_API_URL.includes('identity-login') || _CRM_API_URL.includes('skarion-identity-login')
-  ? 'https://skarion-crm-platform.alsaki1999.workers.dev'
-  : _CRM_API_URL;
+// may accidentally be set to the identity/login URL instead of the Books API.
+export const BOOKS_API_URL = _BOOKS_API_URL.includes('identity-login') || _BOOKS_API_URL.includes('skarion-identity-login')
+  ? 'https://skarion-books-platform.alsaki1999.workers.dev'
+  : _BOOKS_API_URL;
 export const IDENTITY_API_URL = import.meta.env.VITE_IDENTITY_API_URL || 'https://skarion-identity.alsaki1999.workers.dev';
 // The login page is a separate Pages site (not the Worker API). Separate env var so
 // the redirect goes to the right place while API calls still hit the worker.
@@ -56,28 +58,19 @@ export async function refreshAccessToken(): Promise<string | null> {
 /** Bootstraps the auth store by refreshing the token once. Returns the
  *  user payload if the refresh succeeds, null otherwise. Safe to call
  *  from any app's mount effect. */
-export async function bootstrapAuth(): Promise<{ id: string; email: string; name?: string; role: string; isSuperadmin: boolean } | null> {
+export async function bootstrapAuth(): Promise<User | null> {
   const response = await fetch(`${IDENTITY_API_URL}/auth/refresh`, {
     method: 'POST',
     credentials: 'include',
   });
   if (!response.ok) return null;
-  const data = (await response.json()) as {
-    access_token: string;
-    user: {
-      id: string;
-      email: string;
-      displayName?: string;
-      isSuperadmin: boolean;
-      apps: Record<string, string>;
-    };
-  };
+  const data = (await response.json()) as AuthResponse;
   accessToken = data.access_token;
   return {
     id: data.user.id,
     email: data.user.email,
     name: data.user.displayName,
-    role: data.user.apps?.crm ?? '',
+    role: (data.user.apps?.books ?? '') as BooksRole,
     isSuperadmin: data.user.isSuperadmin,
   };
 }
@@ -88,7 +81,7 @@ export function redirectToLogin(): void {
   window.location.href = `${IDENTITY_LOGIN_URL}/?return_to=${returnTo}`;
 }
 
-export async function crmFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function booksFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!accessToken) {
     const refreshed = await refreshAccessToken();
     if (!refreshed) {
@@ -97,7 +90,7 @@ export async function crmFetch<T>(path: string, init: RequestInit = {}): Promise
     }
   }
 
-  const url = `${CRM_API_URL}${path}`;
+  const url = `${BOOKS_API_URL}${path}`;
   const headers = {
     ...(init.body instanceof FormData
       ? {}
@@ -117,7 +110,7 @@ export async function crmFetch<T>(path: string, init: RequestInit = {}): Promise
       redirectToLogin();
       throw new ApiError('Session expired.', 401);
     }
-    response = await fetch(`${CRM_API_URL}${path}`, {
+    response = await fetch(`${BOOKS_API_URL}${path}`, {
       ...init,
       headers: {
         ...(init.body instanceof FormData
@@ -136,117 +129,58 @@ export async function crmFetch<T>(path: string, init: RequestInit = {}): Promise
   return response.json() as Promise<T>;
 }
 
-export interface Company {
+export interface User {
   id: string;
-  name: string;
-  domain: string | null;
-  industry: string | null;
-  size: string | null;
-  address: unknown;
-  ownerId: string;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt: string | null;
-}
-
-export interface Contact {
-  id: string;
-  firstName: string;
-  lastName: string;
   email: string;
-  phone: string | null;
-  title: string | null;
-  companyId: string | null;
-  ownerId: string;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt: string | null;
+  name?: string;
+  role: BooksRole;
+  isSuperadmin: boolean;
 }
 
-export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'disqualified' | 'converted';
-export type LeadSource = 'website' | 'referral' | 'social_media' | 'cold_call' | 'email_campaign' | 'event' | 'pdf_upload' | 'other';
-export type OutreachStatus = 'not_approached' | 'approached' | 'connected' | 'replied' | 'booked_call' | 'not_interested' | 'bad_fit';
-
-export interface Lead {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string | null;
-  companyName: string | null;
-  companyDomain: string | null;
-  linkedinUrl: string | null;
-  outreachStatus: string | null;
-  approachedAt: string | null;
-  connectionStatus: string | null;
-  sourceSheet: string | null;
-  originalRowNumber: number | null;
-  tags: string[] | null;
-  source: LeadSource;
-  status: LeadStatus;
-  notes: string | null;
-  ownerId: string;
-  convertedToContactId: string | null;
-  convertedToCompanyId: string | null;
-  convertedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt: string | null;
+export interface AppMembership {
+  crm?: string;
+  books?: string;
+  hr?: string;
 }
 
-export type OpportunityStage = 'prospecting' | 'qualification' | 'proposal' | 'negotiation' | 'closed_won' | 'closed_lost';
-export type Currency = 'USD' | 'EUR' | 'GBP' | 'CAD' | 'AUD' | 'JPY' | 'AED' | 'SAR';
+export interface AuthResponse {
+  access_token: string;
+  user: {
+    id: string;
+    email: string;
+    displayName?: string;
+    isSuperadmin: boolean;
+    apps: AppMembership;
+  };
+}
 
-export interface Opportunity {
+export interface Account {
   id: string;
+  code: string;
   name: string;
-  companyId: string | null;
-  contactId: string | null;
-  stage: OpportunityStage;
-  amount: string | null;
-  currency: Currency;
-  expectedCloseDate: string | null;
-  probability: number | null;
-  notes: string | null;
-  ownerId: string;
+  type: string;
+  balance: string;
   createdAt: string;
   updatedAt: string;
-  deletedAt: string | null;
 }
 
-export type ActivityType = 'call' | 'email' | 'meeting' | 'note';
-
-export interface Activity {
+export interface Transaction {
   id: string;
-  type: ActivityType;
-  subject: string;
-  content: string | null;
-  contactId: string | null;
-  companyId: string | null;
-  opportunityId: string | null;
-  actorId: string;
-  happenedAt: string;
+  description: string;
+  amount: string;
+  date: string;
+  accountId: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface Task {
+export interface Invoice {
   id: string;
-  title: string;
-  description: string | null;
-  dueDate: string | null;
-  assigneeId: string;
-  contactId: string | null;
-  companyId: string | null;
-  opportunityId: string | null;
-  completedAt: string | null;
-  completedBy: string | null;
-  priority: string;
+  number: string;
+  customerName: string;
+  amount: string;
+  status: string;
+  dueDate: string;
   createdAt: string;
   updatedAt: string;
-  deletedAt: string | null;
-}
-
-export function listCompanies() {
-  return crmFetch<{ companies: Company[] }>('/api/companies');
 }
