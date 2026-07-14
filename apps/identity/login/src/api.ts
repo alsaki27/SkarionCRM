@@ -34,8 +34,10 @@ export interface AppMembershipsMap {
 
 export function login(email: string, password: string) {
   return apiFetch<{
-    pending_token: string;
-    expires_at: string;
+    pending_token?: string;
+    expires_at?: string;
+    access_token?: string;
+    user?: { id: string; email: string; displayName: string };
   }>('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),

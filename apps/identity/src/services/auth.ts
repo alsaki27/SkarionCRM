@@ -82,6 +82,7 @@ export interface LoginStep1Result {
   pendingToken: string;
   code: string;
   expiresAt: Date;
+  isSuperadmin: boolean;
 }
 
 /** Step 1: verify email+password, generate a 6-digit code, store it hashed
@@ -115,7 +116,7 @@ export async function loginStep1(
     expiresAt,
   });
 
-  return { pendingToken, code, expiresAt };
+  return { pendingToken, code, expiresAt, isSuperadmin: found.isSuperadmin };
 }
 
 export interface LoginStep2Params {

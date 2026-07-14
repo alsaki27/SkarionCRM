@@ -18,9 +18,18 @@ export function Login() {
     setLoading(true);
     try {
       const result = await login(email, password);
-      setPendingToken(result.pending_token);
-      setCode('');
-      setStep('code');
+      if (result.access_token) {
+        const meResponse = await me(result.access_token);
+        redirectAfterLogin(meResponse.apps);
+        return;
+      }
+      if (result.pending_token) {
+        setPendingToken(result.pending_token);
+        setCode('');
+        setStep('code');
+        return;
+      }
+      setError('Unexpected server response.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed.');
     } finally {
