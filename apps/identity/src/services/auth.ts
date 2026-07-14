@@ -160,11 +160,29 @@ export async function loginStep2(db: IdentityDb, params: LoginStep2Params): Prom
   return issueSession(db, found, params.jwtSecret, params.ip, params.userAgent);
 }
 
+/** Lookup a user by email (case-insensitive). Returns null if not found. */
+export async function findUserByEmail(
+  db: IdentityDb,
+  email: string
+): Promise<{
+  id: string;
+  email: string;
+  displayName: string;
+  isSuperadmin: boolean;
+  tokenVersion: number;
+  disabledAt: Date | null;
+} | null> {
+  const found = await db.query.users.findFirst({
+    where: (t, { sql }) => sql`lower(${t.email}) = lower(${email})`,
+  });
+  return found ?? null;
+}
+
 /** Issue a real access+refresh token session for a user, updating lastLoginAt.
  *  Refactored out of the old login() tail — used by both loginStep2 (public
  *  OTP flow) and loginInternal (invite-accept auto-sign-in, which skips OTP
  *  because the user just proved ownership of the invite-link email). */
-async function issueSession(
+export async function issueSession(
   db: IdentityDb,
   found: {
     id: string;

@@ -199,22 +199,27 @@ app.post('/auth/login', async (c) => {
   }
   const db = getDb(c.env, schema);
   try {
+    const found = await authService.findUserByEmail(db, body.email);
+    if (found?.isSuperadmin) {
+      if (found.disabledAt) {
+        return c.json({ error: 'Account disabled.' }, 401);
+      }
+      const result = await authService.issueSession(
+        db,
+        found,
+        c.env.JWT_SECRET,
+        c.req.header('CF-Connecting-IP') ?? null,
+        c.req.header('User-Agent') ?? null
+      );
+      setRefreshCookie(c, result.refreshToken, result.refreshTokenExpiresAt);
+      return c.json({ access_token: result.accessToken, user: result.user });
+    }
     const step1 = await authService.loginStep1(db, {
       email: body.email,
       password: body.password,
       ip: c.req.header('CF-Connecting-IP') ?? null,
       userAgent: c.req.header('User-Agent') ?? null,
     });
-    if (step1.isSuperadmin) {
-      const result = await authService.loginInternal(db, {
-        email: body.email,
-        password: body.password,
-        jwtSecret: c.env.JWT_SECRET,
-        mfaEncryptionKey: c.env.MFA_ENCRYPTION_KEY,
-      });
-      setRefreshCookie(c, result.refreshToken, result.refreshTokenExpiresAt);
-      return c.json({ access_token: result.accessToken, user: result.user });
-    }
     const email = await renderLoginCodeEmail({ code: step1.code, expiresInMinutes: 10 });
     try {
       await sendEmail(c.env.RESEND_API_KEY, { to: body.email, ...email });
