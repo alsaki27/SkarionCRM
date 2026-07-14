@@ -1,0 +1,29 @@
+name: Check HR Schema State (temp)
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Check hr schema
+        run: |
+          cat <<'EOF' > /tmp/check.mjs
+          import { neon } from '@neondatabase/serverless';
+          const sql = neon(process.env.DATABASE_URL);
+          const tables = await sql`select table_name from information_schema.tables where table_schema = 'hr'`;
+          console.log('Tables in hr schema:', JSON.stringify(tables));
+          for (const t of tables) {
+            const count = await sql([`select count(*) from "hr"."${t.table_name}"`]);
+            console.log(t.table_name, '->', JSON.stringify(count));
+          }
+          EOF
+          npx tsx /tmp/check.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
