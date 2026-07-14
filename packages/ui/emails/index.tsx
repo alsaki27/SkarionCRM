@@ -24,16 +24,13 @@ import {
   taskDueReminderPreheader,
   taskDueReminderSubject,
 } from './TaskDueReminder.js';
-import {
-  LeadAssignedEmail,
-  leadAssignedPreheader,
-  leadAssignedSubject,
-} from './LeadAssigned.js';
+import { LeadAssignedEmail, leadAssignedPreheader, leadAssignedSubject } from './LeadAssigned.js';
 import {
   OpportunityStageChangedEmail,
   opportunityStageChangedPreheader,
   opportunityStageChangedSubject,
 } from './OpportunityStageChanged.js';
+import { LoginCodeEmail, loginCodePreheader, loginCodeSubject } from './LoginCode.js';
 
 export interface RenderedEmail {
   subject: string;
@@ -137,6 +134,19 @@ export async function renderOpportunityStageChanged(props: {
   };
 }
 
+export async function renderLoginCodeEmail(props: {
+  code: string;
+  expiresInMinutes: number;
+}): Promise<RenderedEmail> {
+  const { html, text } = await renderBoth(<LoginCodeEmail {...props} />);
+  return {
+    subject: loginCodeSubject,
+    preheader: loginCodePreheader,
+    html,
+    text,
+  };
+}
+
 export { InvitationEmail, PasswordResetEmail, MfaEnrolledEmail, WelcomeAfterInviteEmail };
-export { TaskDueReminderEmail, LeadAssignedEmail, OpportunityStageChangedEmail };
+export { TaskDueReminderEmail, LeadAssignedEmail, OpportunityStageChangedEmail, LoginCodeEmail };
 export { EmailLayout } from './EmailLayout.js';
