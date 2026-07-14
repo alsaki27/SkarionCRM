@@ -1,39 +1,89 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { login, me, ApiError } from '../api.js';
+import { login, loginVerify, me } from '../api.js';
 import { redirectAfterLogin } from '../redirect.js';
 
 export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [mfaCode, setMfaCode] = useState('');
-  const [needsMfa, setNeedsMfa] = useState(false);
+  const [code, setCode] = useState('');
+  const [pendingToken, setPendingToken] = useState('');
+  const [step, setStep] = useState<'password' | 'code'>('password');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleStep1(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const result = await login(email, password, mfaCode || undefined);
-      const meResponse = await me(result.access_token);
-      redirectAfterLogin(meResponse.apps);
+      const result = await login(email, password);
+      setPendingToken(result.pending_token);
+      setCode('');
+      setStep('code');
     } catch (err) {
-      if (err instanceof ApiError && err.message.toLowerCase().includes('mfa code required')) {
-        setNeedsMfa(true);
-        setError('Enter your authenticator code.');
-      } else {
-        setError(err instanceof Error ? err.message : 'Login failed.');
-      }
+      setError(err instanceof Error ? err.message : 'Login failed.');
     } finally {
       setLoading(false);
     }
   }
 
+  async function handleStep2(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const result = await loginVerify(pendingToken, code);
+      const meResponse = await me(result.access_token);
+      redirectAfterLogin(meResponse.apps);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Verification failed.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleGoBack() {
+    setStep('password');
+    setPendingToken('');
+    setCode('');
+    setError('');
+  }
+
+  if (step === 'code') {
+    return (
+      <div style={styles.page}>
+        <form onSubmit={handleStep2} style={styles.form}>
+          <h1 style={styles.heading}>Check your email</h1>
+          <p style={styles.subtext}>
+            A 6-digit sign-in code was sent to <strong>{email}</strong>. It expires in 10 minutes.
+          </p>
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="000000"
+            maxLength={6}
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            autoFocus
+            autoComplete="one-time-code"
+            required
+          />
+          {error && <p style={styles.error}>{error}</p>}
+          <button type="submit" disabled={loading || code.length < 6}>
+            {loading ? 'Verifying...' : 'Verify code'}
+          </button>
+          <button type="button" onClick={handleGoBack} style={styles.linkBtn}>
+            Use a different email
+          </button>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.page}>
-      <form onSubmit={handleSubmit} style={styles.form}>
+      <form onSubmit={handleStep1} style={styles.form}>
         <h1 style={styles.heading}>Sign in to Skarion</h1>
         <input
           type="email"
@@ -51,19 +101,9 @@ export function Login() {
           autoComplete="current-password"
           required
         />
-        {needsMfa && (
-          <input
-            type="text"
-            inputMode="numeric"
-            placeholder="6-digit authenticator code"
-            value={mfaCode}
-            onChange={(e) => setMfaCode(e.target.value)}
-            autoFocus
-          />
-        )}
         {error && <p style={styles.error}>{error}</p>}
         <button type="submit" disabled={loading}>
-          {loading ? 'Signing in...' : 'Sign in'}
+          {loading ? 'Sending code...' : 'Sign in'}
         </button>
         <Link to="/forgot-password" style={styles.link}>
           Forgot password?
@@ -88,6 +128,16 @@ export const styles = {
     gap: 12,
   } as React.CSSProperties,
   heading: { fontSize: 18, marginBottom: 4 } as React.CSSProperties,
+  subtext: { fontSize: 13, color: '#52525b', margin: 0 } as React.CSSProperties,
   error: { color: '#dc2626', fontSize: 13, margin: 0 } as React.CSSProperties,
   link: { fontSize: 13, color: '#3f3f46' } as React.CSSProperties,
+  linkBtn: {
+    fontSize: 13,
+    color: '#3f3f46',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    textAlign: 'left' as const,
+    padding: 0,
+  },
 };

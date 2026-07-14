@@ -32,13 +32,23 @@ export interface AppMembershipsMap {
   books?: string;
 }
 
-export function login(email: string, password: string, mfaCode?: string) {
+export function login(email: string, password: string) {
+  return apiFetch<{
+    pending_token: string;
+    expires_at: string;
+  }>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export function loginVerify(pendingToken: string, code: string) {
   return apiFetch<{
     access_token: string;
     user: { id: string; email: string; displayName: string };
-  }>('/auth/login', {
+  }>('/auth/login/verify', {
     method: 'POST',
-    body: JSON.stringify({ email, password, mfa_code: mfaCode }),
+    body: JSON.stringify({ pending_token: pendingToken, code }),
   });
 }
 
