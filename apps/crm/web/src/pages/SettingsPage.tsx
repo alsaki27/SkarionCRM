@@ -1,8 +1,30 @@
 import { useState } from 'react';
 import { useAuthStore, type AuthStore } from '../stores/auth.js';
-import { useIntegrationStatus } from '../hooks/use-api.js';
 import {
-  Settings, Users, Layers, Tag, Puzzle, User, CheckCircle, XCircle, Shield, Mail, FileText, Bot,
+  useIntegrationStatus,
+  useWorkflowRules,
+  useCreateWorkflowRule,
+  useUpdateWorkflowRule,
+  useDeleteWorkflowRule,
+} from '../hooks/use-api.js';
+import {
+  Settings,
+  Users,
+  Layers,
+  Tag,
+  Puzzle,
+  User,
+  CheckCircle,
+  XCircle,
+  Shield,
+  Mail,
+  FileText,
+  Bot,
+  Workflow,
+  Plus,
+  Trash2,
+  Loader2,
+  Clock,
 } from 'lucide-react';
 import { cn } from '../lib/utils.js';
 
@@ -11,6 +33,7 @@ const TABS = [
   { id: 'team', label: 'Team', icon: Users },
   { id: 'pipelines', label: 'Pipelines', icon: Layers },
   { id: 'tags', label: 'Tags', icon: Tag },
+  { id: 'workflows', label: 'Workflows', icon: Workflow },
   { id: 'integrations', label: 'Integrations', icon: Puzzle },
 ] as const;
 
@@ -26,9 +49,22 @@ const PIPELINE_STAGES = [
 ];
 
 const TAGS = [
-  'Hot Lead', 'Warm Lead', 'Cold Lead', 'Decision Maker', 'Influencer',
-  'Enterprise', 'SMB', 'Startup', 'Referral', 'Inbound', 'Outbound',
-  'Follow-up', 'Nurture', 'Qualified', 'Unqualified', 'Competitor',
+  'Hot Lead',
+  'Warm Lead',
+  'Cold Lead',
+  'Decision Maker',
+  'Influencer',
+  'Enterprise',
+  'SMB',
+  'Startup',
+  'Referral',
+  'Inbound',
+  'Outbound',
+  'Follow-up',
+  'Nurture',
+  'Qualified',
+  'Unqualified',
+  'Competitor',
 ];
 
 export default function SettingsPage() {
@@ -62,7 +98,8 @@ export default function SettingsPage() {
                   activeTab === tab.id
                     ? 'border-blue-600 text-blue-700'
                     : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300',
-                  disabled && 'opacity-40 cursor-not-allowed hover:text-slate-500 hover:border-transparent'
+                  disabled &&
+                    'opacity-40 cursor-not-allowed hover:text-slate-500 hover:border-transparent'
                 )}
               >
                 <Icon size={16} />
@@ -82,15 +119,21 @@ export default function SettingsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Name</label>
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Name
+                </label>
                 <div className="mt-1 text-sm font-medium">{user?.name ?? '—'}</div>
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Email</label>
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Email
+                </label>
                 <div className="mt-1 text-sm font-medium">{user?.email ?? '—'}</div>
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Role</label>
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Role
+                </label>
                 <div className="mt-1 flex items-center gap-2">
                   <span className="capitalize text-sm font-medium">{role || '—'}</span>
                   {role === 'manager' && <Shield size={14} className="text-blue-500" />}
@@ -99,11 +142,17 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">User ID</label>
-                <div className="mt-1 text-sm font-mono text-slate-600 bg-slate-50 rounded px-2 py-1">{user?.id ?? '—'}</div>
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  User ID
+                </label>
+                <div className="mt-1 text-sm font-mono text-slate-600 bg-slate-50 rounded px-2 py-1">
+                  {user?.id ?? '—'}
+                </div>
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Superadmin</label>
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Superadmin
+                </label>
                 <div className="mt-1 text-sm">{user?.isSuperadmin ? 'Yes' : 'No'}</div>
               </div>
             </div>
@@ -124,12 +173,17 @@ export default function SettingsPage() {
               </div>
               <div>
                 <div className="text-sm font-medium">{user?.name ?? user?.email ?? 'You'}</div>
-                <div className="text-xs text-slate-500 capitalize">{role} {user?.isSuperadmin && '· Superadmin'}</div>
+                <div className="text-xs text-slate-500 capitalize">
+                  {role} {user?.isSuperadmin && '· Superadmin'}
+                </div>
               </div>
-              <span className="ml-auto text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-medium">You</span>
+              <span className="ml-auto text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-medium">
+                You
+              </span>
             </div>
             <p className="text-sm text-slate-500">
-              Team management is available for managers. Contact your superadmin to add or remove team members.
+              Team management is available for managers. Contact your superadmin to add or remove
+              team members.
             </p>
           </div>
         </div>
@@ -184,10 +238,14 @@ export default function SettingsPage() {
             ))}
           </div>
           <p className="text-sm text-slate-500 mt-4">
-            Tags are read-only placeholders for now. Tag management will be available in a future update.
+            Tags are read-only placeholders for now. Tag management will be available in a future
+            update.
           </p>
         </div>
       )}
+
+      {/* Workflows Tab */}
+      {activeTab === 'workflows' && isManager && <WorkflowRulesPanel />}
 
       {/* Integrations Tab */}
       {activeTab === 'integrations' && isManager && (
@@ -267,6 +325,211 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+const CHANNELS = ['linkedin', 'instagram', 'facebook', 'whatsapp', 'email', 'phone'] as const;
+
+function WorkflowRulesPanel() {
+  const { data: rules, isLoading } = useWorkflowRules();
+  const createMut = useCreateWorkflowRule();
+  const updateMut = useUpdateWorkflowRule();
+  const deleteMut = useDeleteWorkflowRule();
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({
+    name: '',
+    channel: 'linkedin',
+    afterAttempts: '2',
+    waitDays: '7',
+    nextChannel: 'email',
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-8">
+        <Loader2 className="animate-spin text-slate-400" />
+      </div>
+    );
+  }
+
+  const staleRules = (rules ?? []).filter((r) => r.trigger === 'outreach_stale');
+
+  const handleCreate = () => {
+    createMut.mutate(
+      {
+        name: form.name || `${form.channel} → ${form.nextChannel}`,
+        trigger: 'outreach_stale',
+        conditions: {
+          channel: form.channel,
+          afterAttempts: Number(form.afterAttempts) || 2,
+          waitDays: Number(form.waitDays) || 7,
+          nextChannel: form.nextChannel,
+        },
+        actions: {
+          kind: 'escalate_to_next_channel_task',
+          taskTitle: `${form.nextChannel} follow-up due for {{lead.first_name}} {{lead.last_name}} — ${form.channel} stale after ${form.waitDays}d`,
+          taskPriority: 'medium',
+        },
+        enabled: true,
+      },
+      {
+        onSuccess: () => {
+          setShowCreate(false);
+          setForm({
+            name: '',
+            channel: 'linkedin',
+            afterAttempts: '2',
+            waitDays: '7',
+            nextChannel: 'email',
+          });
+        },
+      }
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white border border-slate-200 rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold flex items-center gap-2">
+            <Workflow size={18} className="text-slate-500" /> Outreach Follow-up Rules
+          </h2>
+          <button
+            onClick={() => setShowCreate(!showCreate)}
+            className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-blue-700"
+          >
+            <Plus size={15} /> New Rule
+          </button>
+        </div>
+        <p className="text-sm text-slate-500 mb-4">
+          When a channel goes stale (N attempts with no reply for D days), auto-create a follow-up
+          task for the next channel in the sequence.
+        </p>
+
+        {showCreate && (
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-4 space-y-3">
+            <h3 className="font-medium text-sm">New Outreach Stale Rule</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <label className="text-xs text-slate-500 col-span-2 md:col-span-3">
+                Name
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="e.g. LinkedIn → Email"
+                  className="mt-0.5 border border-slate-200 rounded px-2 py-1 text-sm w-full"
+                />
+              </label>
+              <label className="text-xs text-slate-500">
+                Channel
+                <select
+                  value={form.channel}
+                  onChange={(e) => setForm({ ...form, channel: e.target.value })}
+                  className="mt-0.5 border border-slate-200 rounded px-2 py-1 text-sm w-full"
+                >
+                  {CHANNELS.map((ch) => (
+                    <option key={ch} value={ch}>
+                      {ch}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs text-slate-500">
+                After attempts
+                <input
+                  type="number"
+                  min={1}
+                  value={form.afterAttempts}
+                  onChange={(e) => setForm({ ...form, afterAttempts: e.target.value })}
+                  className="mt-0.5 border border-slate-200 rounded px-2 py-1 text-sm w-full"
+                />
+              </label>
+              <label className="text-xs text-slate-500">
+                Wait days
+                <input
+                  type="number"
+                  min={1}
+                  value={form.waitDays}
+                  onChange={(e) => setForm({ ...form, waitDays: e.target.value })}
+                  className="mt-0.5 border border-slate-200 rounded px-2 py-1 text-sm w-full"
+                />
+              </label>
+              <label className="text-xs text-slate-500">
+                Escalate to
+                <select
+                  value={form.nextChannel}
+                  onChange={(e) => setForm({ ...form, nextChannel: e.target.value })}
+                  className="mt-0.5 border border-slate-200 rounded px-2 py-1 text-sm w-full"
+                >
+                  {CHANNELS.map((ch) => (
+                    <option key={ch} value={ch}>
+                      {ch}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleCreate}
+                disabled={createMut.isPending}
+                className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+              >
+                {createMut.isPending ? <Loader2 size={14} className="animate-spin" /> : 'Create'}
+              </button>
+              <button
+                onClick={() => setShowCreate(false)}
+                className="border border-slate-200 px-4 py-1.5 rounded-lg text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {staleRules.map((rule) => (
+            <div
+              key={rule.id}
+              className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 hover:bg-slate-50"
+            >
+              <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                <Clock size={16} className="text-blue-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium">{rule.name}</div>
+                <div className="text-xs text-slate-500">
+                  {rule.conditions.channel} · {rule.conditions.afterAttempts} attempts ·{' '}
+                  {rule.conditions.waitDays}d → escalate to {rule.conditions.nextChannel}
+                </div>
+              </div>
+              <button
+                onClick={() => updateMut.mutate({ id: rule.id, data: { enabled: !rule.enabled } })}
+                className={cn(
+                  'text-xs font-medium px-2 py-1 rounded',
+                  rule.enabled ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
+                )}
+              >
+                {rule.enabled ? 'Active' : 'Paused'}
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm('Delete this rule?')) deleteMut.mutate(rule.id);
+                }}
+                className="text-slate-400 hover:text-red-500 p-1"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+          {staleRules.length === 0 && (
+            <p className="text-sm text-slate-400 text-center py-6">
+              No outreach follow-up rules yet. Click "New Rule" to create one.
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

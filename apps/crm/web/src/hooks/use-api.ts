@@ -10,6 +10,7 @@ import {
   type Activity,
   type LeadAttachment,
   type ImportBatch,
+  type WorkflowRule,
   getLeadChannels,
   logOutreachAction,
   getAttachments,
@@ -17,6 +18,10 @@ import {
   deleteAttachment,
   listImportBatches,
   listIdentityUsers,
+  listWorkflowRules,
+  createWorkflowRule,
+  updateWorkflowRule,
+  deleteWorkflowRule,
 } from '../api.js';
 
 function useCrmQuery<T>(key: string[], fetcher: () => Promise<T>, enabled = true) {
@@ -559,5 +564,37 @@ export function useIdentityUsers(enabled = true) {
       }
     },
     enabled,
+  });
+}
+
+export function useWorkflowRules() {
+  return useCrmQuery<WorkflowRule[]>(['workflow-rules'], async () => {
+    const res = await listWorkflowRules();
+    return res.workflowRules;
+  });
+}
+
+export function useCreateWorkflowRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<WorkflowRule>) => createWorkflowRule(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['workflow-rules'] }),
+  });
+}
+
+export function useUpdateWorkflowRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<WorkflowRule> }) =>
+      updateWorkflowRule(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['workflow-rules'] }),
+  });
+}
+
+export function useDeleteWorkflowRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteWorkflowRule(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['workflow-rules'] }),
   });
 }

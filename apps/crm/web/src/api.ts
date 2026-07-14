@@ -411,3 +411,41 @@ export async function listIdentityUsers(): Promise<{ users: IdentityUser[] }> {
   }
   return response.json() as Promise<{ users: IdentityUser[] }>;
 }
+
+// ─── Workflow rules (outreach_stale cadence) ───
+
+export interface WorkflowRule {
+  id: string;
+  name: string;
+  trigger: 'lead_created' | 'opportunity_stale' | 'task_due_soon' | 'outreach_stale';
+  conditions: {
+    channel?: string;
+    afterAttempts?: number;
+    waitDays?: number;
+    nextChannel?: string;
+    [key: string]: unknown;
+  };
+  actions: { kind?: string; taskTitle?: string; taskPriority?: string; [key: string]: unknown };
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function listWorkflowRules() {
+  return crmFetch<{ workflowRules: WorkflowRule[] }>('/api/workflow-rules');
+}
+export function createWorkflowRule(data: Partial<WorkflowRule>) {
+  return crmFetch<{ workflowRule: WorkflowRule }>('/api/workflow-rules', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+export function updateWorkflowRule(id: string, data: Partial<WorkflowRule>) {
+  return crmFetch<{ workflowRule: WorkflowRule }>(`/api/workflow-rules/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+export function deleteWorkflowRule(id: string) {
+  return crmFetch<{ success: boolean }>(`/api/workflow-rules/${id}`, { method: 'DELETE' });
+}

@@ -19,14 +19,14 @@ export default {
   },
 
   async scheduled(event: ScheduledEvent, env: Env): Promise<void> {
-    const triggers = ['opportunity_stale', 'task_due_soon'] as const;
+    const triggers = ['opportunity_stale', 'task_due_soon', 'outreach_stale'] as const;
     for (const trigger of triggers) {
       try {
         const res = await fetch(`${env.WORKFLOW_RUNNER_URL}/evaluate/${trigger}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${env.WORKFLOW_RUNNER_SECRET}`,
+            Authorization: `Bearer ${env.WORKFLOW_RUNNER_SECRET}`,
           },
         });
         if (!res.ok) {
