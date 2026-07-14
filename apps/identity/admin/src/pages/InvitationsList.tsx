@@ -111,13 +111,13 @@ export function InvitationsList() {
           <option value="hr">hr</option>
           <option value="books">books</option>
         </select>
-        <input
-          type="text"
-          placeholder="Role (manager or member)"
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-          required
-        />
+        <select value={role} onChange={(e) => setRole(e.target.value)} required>
+          <option value="" disabled>
+            Select role...
+          </option>
+          <option value="member">member</option>
+          <option value="manager">manager</option>
+        </select>
         <button type="submit" disabled={busy}>
           Invite
         </button>

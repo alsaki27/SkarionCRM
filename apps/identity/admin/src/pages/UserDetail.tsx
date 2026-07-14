@@ -102,13 +102,15 @@ export function UserDetail() {
             <tr key={app}>
               <td style={{ padding: '4px 8px', width: 80 }}>{app}</td>
               <td style={{ padding: '4px 8px' }}>
-                <input
-                  type="text"
-                  placeholder="(no access - leave blank)"
+                <select
                   value={roleInputs[app] ?? ''}
                   onChange={(e) => setRoleInputs((p) => ({ ...p, [app]: e.target.value }))}
                   style={{ width: 200 }}
-                />
+                >
+                  <option value="">(no access)</option>
+                  <option value="member">member</option>
+                  <option value="manager">manager</option>
+                </select>
               </td>
               <td style={{ padding: '4px 8px' }}>
                 <button disabled={busy} onClick={() => saveMembership(app)}>
