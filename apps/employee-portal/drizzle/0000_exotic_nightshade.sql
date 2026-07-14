@@ -49,10 +49,10 @@ CREATE TABLE "hr"."employees" (
 CREATE TABLE "hr"."time_off_requests" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"employee_id" uuid NOT NULL,
-	"type" time_off_type NOT NULL,
+	"type" "hr"."time_off_type" NOT NULL,
 	"start_date" date NOT NULL,
 	"end_date" date NOT NULL,
-	"status" time_off_status DEFAULT 'pending' NOT NULL,
+	"status" "hr"."time_off_status" DEFAULT 'pending' NOT NULL,
 	"reason" text,
 	"approved_by" uuid,
 	"approved_at" timestamp with time zone,
