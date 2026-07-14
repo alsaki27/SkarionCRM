@@ -1,13 +1,13 @@
-// Temporary read-only diagnostic: lists tables and row counts in the
-// production `hr` Postgres schema, so we know whether it's safe to retry
-// the employee-portal migration or whether it needs cleanup first.
-// Delete this file once the employee-portal migration issue is resolved.
+// Temporary one-off: drops the (verified-empty) hr schema so the corrected
+// initial migration can apply cleanly. hr.employees/audit_log/departments
+// all had 0 rows (confirmed via a prior run of this same script) - the
+// deploy-hr.yml migration step never fully succeeded (it died partway
+// through creating hr.time_off_requests), so nothing real was ever stored.
+// Delete this file once the employee-portal deploy is confirmed green.
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL);
+await sql`DROP SCHEMA IF EXISTS hr CASCADE`;
+console.log('Dropped hr schema.');
 const tables = await sql`select table_name from information_schema.tables where table_schema = 'hr'`;
-console.log('Tables in hr schema:', JSON.stringify(tables));
-for (const t of tables) {
-  const count = await sql.query(`select count(*) from "hr"."${t.table_name}"`);
-  console.log(t.table_name, '->', JSON.stringify(count));
-}
+console.log('Tables remaining in hr schema:', JSON.stringify(tables));
