@@ -16,7 +16,13 @@ const ACCESS_TOKEN_TTL_SECONDS = 15 * 60; // 15 minutes
 // identity-issued tokens, so there's one implementation, not N copies that
 // could drift. Signing stays here: only identity ever signs a token.
 export async function signAccessToken(
-  params: { userId: string; email: string; apps: AppMembershipsMap; isSuperadmin: boolean; tokenVersion: number },
+  params: {
+    userId: string;
+    email: string;
+    apps: AppMembershipsMap;
+    isSuperadmin: boolean;
+    tokenVersion: number;
+  },
   secret: string
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
@@ -37,6 +43,15 @@ export function generateOpaqueToken(byteLength = 32): string {
   const bytes = new Uint8Array(byteLength);
   crypto.getRandomValues(bytes);
   return base64url(bytes);
+}
+
+/** Random numeric code (6-digit by default) using crypto.getRandomValues, not Math.random(). */
+export function generateNumericCode(length = 6): string {
+  const digits = new Uint8Array(length);
+  crypto.getRandomValues(digits);
+  let code = '';
+  for (const b of digits) code += (b % 10).toString();
+  return code;
 }
 
 // Set once per request (see the middleware in index.ts) rather than threaded

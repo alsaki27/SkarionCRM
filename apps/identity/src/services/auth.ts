@@ -9,7 +9,12 @@ import * as schema from '../db/schema.js';
 import type { IdentityDb } from '../db/types.js';
 import { decryptMfaSecret, encryptMfaSecret } from '../lib/mfa-crypto.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
-import { generateOpaqueToken, sha256Hex, signAccessToken } from '../lib/tokens.js';
+import {
+  generateOpaqueToken,
+  generateNumericCode,
+  sha256Hex,
+  signAccessToken,
+} from '../lib/tokens.js';
 import {
   buildProvisioningUri,
   generateBase32Secret,
@@ -20,11 +25,13 @@ import type { AppMembershipsMap } from '../lib/types.js';
 
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 export const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
+const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const OTP_MAX_ATTEMPTS = 5;
 
 export class AuthError extends Error {
   constructor(
     message: string,
-    public status: 400 | 401 | 403 | 404 | 409 = 401
+    public status: 400 | 401 | 403 | 404 | 409 | 429 = 401
   ) {
     super(message);
   }
@@ -55,10 +62,163 @@ export interface LoginResult {
   accessToken: string;
   refreshToken: string;
   refreshTokenExpiresAt: Date;
-  user: { id: string; email: string; displayName: string; isSuperadmin: boolean; apps: AppMembershipsMap };
+  user: {
+    id: string;
+    email: string;
+    displayName: string;
+    isSuperadmin: boolean;
+    apps: AppMembershipsMap;
+  };
 }
 
-export async function login(db: IdentityDb, params: LoginParams): Promise<LoginResult> {
+export interface LoginStep1Params {
+  email: string;
+  password: string;
+  ip?: string | null;
+  userAgent?: string | null;
+}
+
+export interface LoginStep1Result {
+  pendingToken: string;
+  code: string;
+  expiresAt: Date;
+}
+
+/** Step 1: verify email+password, generate a 6-digit code, store it hashed
+ *  alongside an opaque pending token, return both (plaintext) to the caller.
+ *  The route layer owns email I/O — this function returns `code` plaintext
+ *  so the route can pass it to sendEmail, exactly how requestPasswordReset
+ *  returns a plaintext token for the route layer to embed in a URL. */
+export async function loginStep1(
+  db: IdentityDb,
+  params: LoginStep1Params
+): Promise<LoginStep1Result> {
+  const found = await db.query.users.findFirst({
+    where: (t, { sql }) => sql`lower(${t.email}) = lower(${params.email})`,
+  });
+  if (!found || !found.passwordHash || found.disabledAt) {
+    throw new AuthError('Invalid email or password.', 401);
+  }
+  const validPassword = await verifyPassword(params.password, found.passwordHash);
+  if (!validPassword) throw new AuthError('Invalid email or password.', 401);
+
+  const pendingToken = generateOpaqueToken();
+  const pendingTokenHash = await sha256Hex(pendingToken);
+  const code = generateNumericCode(6);
+  const codeHash = await sha256Hex(code);
+  const expiresAt = new Date(Date.now() + OTP_TTL_MS);
+
+  await db.insert(schema.loginOtpCodes).values({
+    userId: found.id,
+    codeHash,
+    pendingTokenHash,
+    expiresAt,
+  });
+
+  return { pendingToken, code, expiresAt };
+}
+
+export interface LoginStep2Params {
+  pendingToken: string;
+  code: string;
+  ip?: string | null;
+  userAgent?: string | null;
+  jwtSecret: string;
+}
+
+/** Step 2: verify the emailed code against the pending token, issue the real session. */
+export async function loginStep2(db: IdentityDb, params: LoginStep2Params): Promise<LoginResult> {
+  const pendingTokenHash = await sha256Hex(params.pendingToken);
+  const otp = await db.query.loginOtpCodes.findFirst({
+    where: eq(schema.loginOtpCodes.pendingTokenHash, pendingTokenHash),
+  });
+  if (!otp || otp.consumedAt || otp.expiresAt < new Date()) {
+    throw new AuthError('Code expired or invalid. Please sign in again.', 401);
+  }
+  if (otp.attemptCount >= OTP_MAX_ATTEMPTS) {
+    throw new AuthError('Too many incorrect code attempts. Please sign in again.', 429);
+  }
+
+  const codeHash = await sha256Hex(params.code);
+  if (codeHash !== otp.codeHash) {
+    await db
+      .update(schema.loginOtpCodes)
+      .set({ attemptCount: otp.attemptCount + 1 })
+      .where(eq(schema.loginOtpCodes.id, otp.id));
+    throw new AuthError('Incorrect code.', 401);
+  }
+
+  await db
+    .update(schema.loginOtpCodes)
+    .set({ consumedAt: new Date() })
+    .where(eq(schema.loginOtpCodes.id, otp.id));
+
+  const found = await db.query.users.findFirst({ where: eq(schema.users.id, otp.userId) });
+  if (!found || found.disabledAt) throw new AuthError('Account disabled.', 401);
+
+  return issueSession(db, found, params.jwtSecret, params.ip, params.userAgent);
+}
+
+/** Issue a real access+refresh token session for a user, updating lastLoginAt.
+ *  Refactored out of the old login() tail — used by both loginStep2 (public
+ *  OTP flow) and loginInternal (invite-accept auto-sign-in, which skips OTP
+ *  because the user just proved ownership of the invite-link email). */
+async function issueSession(
+  db: IdentityDb,
+  found: {
+    id: string;
+    email: string;
+    displayName: string;
+    isSuperadmin: boolean;
+    tokenVersion: number;
+  },
+  jwtSecret: string,
+  ip?: string | null,
+  userAgent?: string | null
+): Promise<LoginResult> {
+  const apps = await getActiveMemberships(db, found.id);
+  const accessToken = await signAccessToken(
+    {
+      userId: found.id,
+      email: found.email,
+      apps,
+      isSuperadmin: found.isSuperadmin,
+      tokenVersion: found.tokenVersion,
+    },
+    jwtSecret
+  );
+  const refreshToken = generateOpaqueToken();
+  const refreshTokenHash = await sha256Hex(refreshToken);
+  const refreshTokenExpiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+  await db.insert(schema.sessions).values({
+    userId: found.id,
+    refreshTokenHash,
+    userAgent: userAgent ?? null,
+    ip: ip ?? null,
+    expiresAt: refreshTokenExpiresAt,
+  });
+  await db
+    .update(schema.users)
+    .set({ lastLoginAt: new Date() })
+    .where(eq(schema.users.id, found.id));
+  return {
+    accessToken,
+    refreshToken,
+    refreshTokenExpiresAt,
+    user: {
+      id: found.id,
+      email: found.email,
+      displayName: found.displayName,
+      isSuperadmin: found.isSuperadmin,
+      apps,
+    },
+  };
+}
+
+/** Internal-only login used by invite-accept auto-sign-in — skips OTP because
+ *  the user just proved they own the invite-link email. The public /auth/login
+ *  route must use loginStep1/loginStep2, never this function. */
+export async function loginInternal(db: IdentityDb, params: LoginParams): Promise<LoginResult> {
   // Case-insensitive lookup; the unique index is on lower(email).
   const found = await db.query.users.findFirst({
     where: (t, { sql }) => sql`lower(${t.email}) = lower(${params.email})`,
@@ -81,35 +241,7 @@ export async function login(db: IdentityDb, params: LoginParams): Promise<LoginR
     if (!ok) throw new AuthError('Invalid MFA code.', 401);
   }
 
-  const apps = await getActiveMemberships(db, found.id);
-  const accessToken = await signAccessToken(
-    { userId: found.id, email: found.email, apps, isSuperadmin: found.isSuperadmin, tokenVersion: found.tokenVersion },
-    params.jwtSecret
-  );
-
-  const refreshToken = generateOpaqueToken();
-  const refreshTokenHash = await sha256Hex(refreshToken);
-  const refreshTokenExpiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
-
-  await db.insert(schema.sessions).values({
-    userId: found.id,
-    refreshTokenHash,
-    userAgent: params.userAgent ?? null,
-    ip: params.ip ?? null,
-    expiresAt: refreshTokenExpiresAt,
-  });
-
-  await db
-    .update(schema.users)
-    .set({ lastLoginAt: new Date() })
-    .where(eq(schema.users.id, found.id));
-
-  return {
-    accessToken,
-    refreshToken,
-    refreshTokenExpiresAt,
-    user: { id: found.id, email: found.email, displayName: found.displayName, isSuperadmin: found.isSuperadmin, apps },
-  };
+  return issueSession(db, found, params.jwtSecret, params.ip, params.userAgent);
 }
 
 export interface RefreshParams {
@@ -132,7 +264,13 @@ export async function refresh(db: IdentityDb, params: RefreshParams): Promise<Lo
 
   const apps = await getActiveMemberships(db, user.id);
   const accessToken = await signAccessToken(
-    { userId: user.id, email: user.email, apps, isSuperadmin: user.isSuperadmin, tokenVersion: user.tokenVersion },
+    {
+      userId: user.id,
+      email: user.email,
+      apps,
+      isSuperadmin: user.isSuperadmin,
+      tokenVersion: user.tokenVersion,
+    },
     params.jwtSecret
   );
 
@@ -151,7 +289,13 @@ export async function refresh(db: IdentityDb, params: RefreshParams): Promise<Lo
     accessToken,
     refreshToken: newRefreshToken,
     refreshTokenExpiresAt: newExpiresAt,
-    user: { id: user.id, email: user.email, displayName: user.displayName, isSuperadmin: user.isSuperadmin, apps },
+    user: {
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      isSuperadmin: user.isSuperadmin,
+      apps,
+    },
   };
 }
 
