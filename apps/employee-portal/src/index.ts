@@ -170,9 +170,12 @@ app.get('/api/departments/:id', async (c) => {
 app.put('/api/departments/:id', async (c) => {
   const db = getDb(c.env, schema) as HrDb;
   const id = c.req.param('id');
-  const _role = getRole(c);
+  const role = getRole(c);
   const isSuperadmin = c.get('isSuperadmin');
   const caller = { userId: c.get('userId'), isSuperadmin };
+  if (!can(isSuperadmin, role, 'edit', { ownerId: caller.userId }, caller)) {
+    return c.json({ error: 'Forbidden.' }, 403);
+  }
 
   const [existing] = await db
     .select()
@@ -210,9 +213,12 @@ app.put('/api/departments/:id', async (c) => {
 app.delete('/api/departments/:id', async (c) => {
   const db = getDb(c.env, schema) as HrDb;
   const id = c.req.param('id');
-  const _role = getRole(c);
+  const role = getRole(c);
   const isSuperadmin = c.get('isSuperadmin');
   const caller = { userId: c.get('userId'), isSuperadmin };
+  if (!can(isSuperadmin, role, 'delete', { ownerId: caller.userId }, caller)) {
+    return c.json({ error: 'Forbidden.' }, 403);
+  }
 
   const [existing] = await db
     .select()
@@ -271,7 +277,15 @@ app.get('/api/employees', async (c) => {
     .orderBy(desc(schema.employees.updatedAt))
     .limit(100);
 
-  return c.json({ employees: rows });
+  return c.json({
+    employees: rows.map((e) => {
+      if (!isSuperadmin && role !== 'manager') {
+        const { salary: _salary, salaryCurrency: _salaryCurrency, ...rest } = e;
+        return { ...rest, salary: null, salaryCurrency: 'USD' };
+      }
+      return e;
+    }),
+  });
 });
 
 app.post('/api/employees', async (c) => {
@@ -319,7 +333,7 @@ app.post('/api/employees', async (c) => {
 app.get('/api/employees/:id', async (c) => {
   const db = getDb(c.env, schema) as HrDb;
   const id = c.req.param('id');
-  const _role = getRole(c);
+  const role = getRole(c);
   const isSuperadmin = c.get('isSuperadmin');
   const _caller = { userId: c.get('userId'), isSuperadmin };
 
@@ -329,15 +343,23 @@ app.get('/api/employees/:id', async (c) => {
     .where(and(eq(schema.employees.id, id), isNull(schema.employees.deletedAt)));
   if (!row) return c.json({ error: 'Not found.' }, 404);
 
+  if (!isSuperadmin && role !== 'manager') {
+    const { salary: _salary, salaryCurrency: _salaryCurrency, ...rest } = row;
+    return c.json({ employee: { ...rest, salary: null, salaryCurrency: 'USD' } });
+  }
+
   return c.json({ employee: row });
 });
 
 app.put('/api/employees/:id', async (c) => {
   const db = getDb(c.env, schema) as HrDb;
   const id = c.req.param('id');
-  const _role = getRole(c);
+  const role = getRole(c);
   const isSuperadmin = c.get('isSuperadmin');
   const caller = { userId: c.get('userId'), isSuperadmin };
+  if (!can(isSuperadmin, role, 'edit', { ownerId: caller.userId }, caller)) {
+    return c.json({ error: 'Forbidden.' }, 403);
+  }
 
   const [existing] = await db
     .select()
@@ -379,9 +401,12 @@ app.put('/api/employees/:id', async (c) => {
 app.delete('/api/employees/:id', async (c) => {
   const db = getDb(c.env, schema) as HrDb;
   const id = c.req.param('id');
-  const _role = getRole(c);
+  const role = getRole(c);
   const isSuperadmin = c.get('isSuperadmin');
   const caller = { userId: c.get('userId'), isSuperadmin };
+  if (!can(isSuperadmin, role, 'delete', { ownerId: caller.userId }, caller)) {
+    return c.json({ error: 'Forbidden.' }, 403);
+  }
 
   const [existing] = await db
     .select()
@@ -550,7 +575,7 @@ app.put('/api/time-off/:id/review', async (c) => {
 app.delete('/api/time-off/:id', async (c) => {
   const db = getDb(c.env, schema) as HrDb;
   const id = c.req.param('id');
-  const _role = getRole(c);
+  const role = getRole(c);
   const isSuperadmin = c.get('isSuperadmin');
   const caller = { userId: c.get('userId'), isSuperadmin };
 
@@ -567,7 +592,7 @@ app.delete('/api/time-off/:id', async (c) => {
   if (!emp) return c.json({ error: 'Employee not found.' }, 404);
 
   const isOwn = emp.userId === caller.userId;
-  if (!isSuperadmin && !isOwn) {
+  if (!isSuperadmin && !isOwn && role !== 'manager') {
     return c.json({ error: 'Forbidden.' }, 403);
   }
 
