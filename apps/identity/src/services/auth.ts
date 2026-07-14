@@ -178,6 +178,30 @@ export async function findUserByEmail(
   return found ?? null;
 }
 
+/** Verifies a superadmin's password before the caller skips the OTP step.
+ *  A prior version of this code path issued a session for any account
+ *  with isSuperadmin=true without checking the password at all - a full
+ *  auth bypass for the (predictable) admin email. Never remove this check;
+ *  the OTP step is what's optional for superadmins, not the password. */
+export async function authenticateSuperadmin(
+  db: IdentityDb,
+  params: { email: string; password: string }
+): Promise<{
+  id: string;
+  email: string;
+  displayName: string;
+  isSuperadmin: boolean;
+  tokenVersion: number;
+} | null> {
+  const found = await db.query.users.findFirst({
+    where: (t, { sql }) => sql`lower(${t.email}) = lower(${params.email})`,
+  });
+  if (!found || !found.isSuperadmin || !found.passwordHash || found.disabledAt) return null;
+  const validPassword = await verifyPassword(params.password, found.passwordHash);
+  if (!validPassword) return null;
+  return found;
+}
+
 /** Issue a real access+refresh token session for a user, updating lastLoginAt.
  *  Refactored out of the old login() tail — used by both loginStep2 (public
  *  OTP flow) and loginInternal (invite-accept auto-sign-in, which skips OTP

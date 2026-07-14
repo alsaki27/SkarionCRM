@@ -199,14 +199,19 @@ app.post('/auth/login', async (c) => {
   }
   const db = getDb(c.env, schema);
   try {
-    const found = await authService.findUserByEmail(db, body.email);
-    if (found?.isSuperadmin) {
-      if (found.disabledAt) {
-        return c.json({ error: 'Account disabled.' }, 401);
-      }
+    // Superadmins skip the email-OTP step (Ticket 1.6), but the password
+    // check is NOT optional - authenticateSuperadmin verifies it. Returns
+    // null on any password mismatch, missing user, or disabled account, so
+    // a wrong password here falls through to the generic "invalid email or
+    // password" below rather than ever issuing a session.
+    const superadmin = await authService.authenticateSuperadmin(db, {
+      email: body.email,
+      password: body.password,
+    });
+    if (superadmin) {
       const result = await authService.issueSession(
         db,
-        found,
+        superadmin,
         c.env.JWT_SECRET,
         c.req.header('CF-Connecting-IP') ?? null,
         c.req.header('User-Agent') ?? null

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { loginStep1, loginStep2, AuthError } from './auth.js';
+import { loginStep1, loginStep2, authenticateSuperadmin, AuthError } from './auth.js';
 import { verifyPassword } from '../lib/password.js';
 import {
   generateNumericCode,
@@ -18,11 +18,9 @@ function mockDb() {
       loginOtpCodes: { findFirst: vi.fn() },
     },
     insert: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) }),
-    update: vi
-      .fn()
-      .mockReturnValue({
-        set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
-      }),
+    update: vi.fn().mockReturnValue({
+      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+    }),
     select: vi
       .fn()
       .mockReturnValue({ from: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }) }),
@@ -202,5 +200,91 @@ describe('loginStep2', () => {
     expect(result.accessToken).toBe('mock-access-token');
     expect(result.refreshToken).toBe('mock-refresh');
     expect(result.user.id).toBe('u1');
+  });
+});
+
+// Regression coverage for a real production incident: a prior version of
+// the superadmin-skips-OTP login path issued a session for any account
+// with isSuperadmin=true WITHOUT checking the password at all - a full
+// auth bypass, since the admin email is predictable. These tests exist
+// specifically to make that regression impossible to reintroduce silently.
+describe('authenticateSuperadmin', () => {
+  it('returns null on wrong password for a superadmin account', async () => {
+    vi.mocked(verifyPassword).mockResolvedValue(false);
+    const db = mockDb();
+    db.query.users.findFirst.mockResolvedValue({
+      id: 'admin1',
+      email: 'admin@skarion.com',
+      passwordHash: 'hash',
+      isSuperadmin: true,
+      disabledAt: null,
+    });
+    const result = await authenticateSuperadmin(db, {
+      email: 'admin@skarion.com',
+      password: 'wrong-or-anything',
+    });
+    expect(result).toBeNull();
+  });
+
+  it('returns null for a non-superadmin account regardless of password', async () => {
+    vi.mocked(verifyPassword).mockResolvedValue(true);
+    const db = mockDb();
+    db.query.users.findFirst.mockResolvedValue({
+      id: 'u1',
+      email: 'a@b.com',
+      passwordHash: 'hash',
+      isSuperadmin: false,
+      disabledAt: null,
+    });
+    const result = await authenticateSuperadmin(db, { email: 'a@b.com', password: 'x' });
+    expect(result).toBeNull();
+  });
+
+  it('returns null when the account does not exist', async () => {
+    const db = mockDb();
+    db.query.users.findFirst.mockResolvedValue(undefined);
+    const result = await authenticateSuperadmin(db, {
+      email: 'nobody@skarion.com',
+      password: 'x',
+    });
+    expect(result).toBeNull();
+  });
+
+  it('returns null for a disabled superadmin account even with the correct password', async () => {
+    vi.mocked(verifyPassword).mockResolvedValue(true);
+    const db = mockDb();
+    db.query.users.findFirst.mockResolvedValue({
+      id: 'admin1',
+      email: 'admin@skarion.com',
+      passwordHash: 'hash',
+      isSuperadmin: true,
+      disabledAt: new Date(),
+    });
+    const result = await authenticateSuperadmin(db, {
+      email: 'admin@skarion.com',
+      password: 'correct',
+    });
+    expect(result).toBeNull();
+  });
+
+  it('returns the user only when the password actually matches', async () => {
+    vi.mocked(verifyPassword).mockResolvedValue(true);
+    const db = mockDb();
+    db.query.users.findFirst.mockResolvedValue({
+      id: 'admin1',
+      email: 'admin@skarion.com',
+      displayName: 'Admin',
+      passwordHash: 'hash',
+      isSuperadmin: true,
+      tokenVersion: 1,
+      disabledAt: null,
+    });
+    const result = await authenticateSuperadmin(db, {
+      email: 'admin@skarion.com',
+      password: 'correct',
+    });
+    expect(result).not.toBeNull();
+    expect(result?.id).toBe('admin1');
+    expect(vi.mocked(verifyPassword)).toHaveBeenCalledWith('correct', 'hash');
   });
 });
