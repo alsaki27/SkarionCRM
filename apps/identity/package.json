@@ -7,7 +7,7 @@
   "scripts": {
     "build": "echo \"(stub) no build yet for @skarion/identity\"",
     "dev": "echo \"(stub) no dev yet for @skarion/identity\"",
-    "test": "echo \"(stub) no tests yet for @skarion/identity\"",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0",
     "db:generate": "drizzle-kit generate",
@@ -16,7 +16,8 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260620.1",
     "tsx": "^4.22.4",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "@neondatabase/serverless": "1.1.0",
