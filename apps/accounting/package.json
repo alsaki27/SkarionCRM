@@ -10,9 +10,9 @@
     "./db/types": "./src/db/types.ts"
   },
   "scripts": {
-    "build": "echo '(stub) no build yet for @skarion/accounting'",
-    "dev": "echo '(stub) no dev yet for @skarion/accounting'",
-    "test": "echo '(stub) no tests yet for @skarion/accounting'",
+    "build": "wrangler build --dry-run 2>/dev/null || tsc --noEmit",
+    "dev": "wrangler dev --port 8787",
+    "test": "echo \"(stub) no tests yet for @skarion/accounting\"",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0",
     "db:generate": "drizzle-kit generate",

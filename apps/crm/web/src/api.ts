@@ -15,14 +15,16 @@
 const _CRM_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8788';
 // Guard against misconfigured Pages dashboard env vars where VITE_API_URL
 // may accidentally be set to the identity/login URL instead of the CRM API.
-export const CRM_API_URL = _CRM_API_URL.includes('identity-login') || _CRM_API_URL.includes('skarion-identity-login')
-  ? 'https://skarion-crm-platform.alsaki1999.workers.dev'
-  : _CRM_API_URL;
-export const IDENTITY_API_URL = import.meta.env.VITE_IDENTITY_API_URL || 'https://skarion-identity.alsaki1999.workers.dev';
+export const CRM_API_URL =
+  _CRM_API_URL.includes('identity-login') || _CRM_API_URL.includes('skarion-identity-login')
+    ? 'https://skarion-crm-platform.alsaki1999.workers.dev'
+    : _CRM_API_URL;
+export const IDENTITY_API_URL =
+  import.meta.env.VITE_IDENTITY_API_URL || 'https://skarion-identity.alsaki1999.workers.dev';
 // The login page is a separate Pages site (not the Worker API). Separate env var so
 // the redirect goes to the right place while API calls still hit the worker.
-export const IDENTITY_LOGIN_URL = import.meta.env.VITE_IDENTITY_LOGIN_URL || 'https://skarion-identity-login.pages.dev';
-
+export const IDENTITY_LOGIN_URL =
+  import.meta.env.VITE_IDENTITY_LOGIN_URL || 'https://skarion-identity-login.pages.dev';
 
 let accessToken: string | null = null;
 
@@ -56,7 +58,13 @@ export async function refreshAccessToken(): Promise<string | null> {
 /** Bootstraps the auth store by refreshing the token once. Returns the
  *  user payload if the refresh succeeds, null otherwise. Safe to call
  *  from any app's mount effect. */
-export async function bootstrapAuth(): Promise<{ id: string; email: string; name?: string; role: string; isSuperadmin: boolean } | null> {
+export async function bootstrapAuth(): Promise<{
+  id: string;
+  email: string;
+  name?: string;
+  role: string;
+  isSuperadmin: boolean;
+} | null> {
   const response = await fetch(`${IDENTITY_API_URL}/auth/refresh`, {
     method: 'POST',
     credentials: 'include',
@@ -99,9 +107,7 @@ export async function crmFetch<T>(path: string, init: RequestInit = {}): Promise
 
   const url = `${CRM_API_URL}${path}`;
   const headers = {
-    ...(init.body instanceof FormData
-      ? {}
-      : { 'Content-Type': 'application/json' }),
+    ...(init.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
     Authorization: `Bearer ${accessToken}`,
     ...init.headers,
   };
@@ -120,9 +126,7 @@ export async function crmFetch<T>(path: string, init: RequestInit = {}): Promise
     response = await fetch(`${CRM_API_URL}${path}`, {
       ...init,
       headers: {
-        ...(init.body instanceof FormData
-          ? {}
-          : { 'Content-Type': 'application/json' }),
+        ...(init.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
         Authorization: `Bearer ${accessToken}`,
         ...init.headers,
       },
@@ -164,8 +168,23 @@ export interface Contact {
 }
 
 export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'disqualified' | 'converted';
-export type LeadSource = 'website' | 'referral' | 'social_media' | 'cold_call' | 'email_campaign' | 'event' | 'pdf_upload' | 'other';
-export type OutreachStatus = 'not_approached' | 'approached' | 'connected' | 'replied' | 'booked_call' | 'not_interested' | 'bad_fit';
+export type LeadSource =
+  | 'website'
+  | 'referral'
+  | 'social_media'
+  | 'cold_call'
+  | 'email_campaign'
+  | 'event'
+  | 'pdf_upload'
+  | 'other';
+export type OutreachStatus =
+  | 'not_approached'
+  | 'approached'
+  | 'connected'
+  | 'replied'
+  | 'booked_call'
+  | 'not_interested'
+  | 'bad_fit';
 
 export interface Lead {
   id: string;
@@ -192,9 +211,17 @@ export interface Lead {
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
+  leadNumber?: string;
+  batchId?: string | null;
 }
 
-export type OpportunityStage = 'prospecting' | 'qualification' | 'proposal' | 'negotiation' | 'closed_won' | 'closed_lost';
+export type OpportunityStage =
+  | 'prospecting'
+  | 'qualification'
+  | 'proposal'
+  | 'negotiation'
+  | 'closed_won'
+  | 'closed_lost';
 export type Currency = 'USD' | 'EUR' | 'GBP' | 'CAD' | 'AUD' | 'JPY' | 'AED' | 'SAR';
 
 export interface Opportunity {
@@ -242,6 +269,8 @@ export interface Task {
   completedAt: string | null;
   completedBy: string | null;
   priority: string;
+  type?: string;
+  leadId?: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -249,4 +278,136 @@ export interface Task {
 
 export function listCompanies() {
   return crmFetch<{ companies: Company[] }>('/api/companies');
+}
+
+// ─── Outreach channels / attachments / import batches ───
+
+export type OutreachChannel =
+  | 'linkedin'
+  | 'instagram'
+  | 'facebook'
+  | 'whatsapp'
+  | 'email'
+  | 'phone';
+export type LeadChannelStage =
+  | 'not_started'
+  | 'connection_request_sent'
+  | 'connection_accepted'
+  | 'message_sent'
+  | 'awaiting_reply'
+  | 'in_conversation'
+  | 'warm_up_needed'
+  | 'replied'
+  | 'booked_call'
+  | 'no_response';
+
+export interface LeadChannel {
+  id: string;
+  leadId: string;
+  channel: OutreachChannel;
+  stage: LeadChannelStage;
+  attemptCount: number;
+  lastAttemptAt: string | null;
+  nextFollowupAt: string | null;
+  sequence: number;
+  ownerId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LeadAttachment {
+  id: string;
+  leadId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  r2Key: string;
+  uploadedBy: string;
+  createdAt: string;
+}
+
+export interface ImportBatch {
+  id: string;
+  name: string;
+  importedByUserId: string;
+  source: string;
+  totalRows: number;
+  importedCount: number;
+  duplicatesSkipped: number;
+  defaultTags: string[] | null;
+  createdAt: string;
+}
+
+export function getLeadChannels(id: string) {
+  return crmFetch<{ channels: LeadChannel[] }>(`/api/leads/${id}/channels`);
+}
+
+export function logOutreachAction(
+  leadId: string,
+  body: { channel: string; stage?: string; action?: 'log_attempt' | 'set_stage' }
+) {
+  return crmFetch(`/api/leads/${leadId}/outreach-actions`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function getAttachments(leadId: string) {
+  return crmFetch<{ attachments: LeadAttachment[] }>(`/api/leads/${leadId}/attachments`);
+}
+
+export function uploadAttachment(leadId: string, file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+  return crmFetch(`/api/leads/${leadId}/attachments`, { method: 'POST', body: formData });
+}
+
+export function deleteAttachment(id: string) {
+  return crmFetch(`/api/leads/attachments/${id}`, { method: 'DELETE' });
+}
+
+export function listImportBatches() {
+  return crmFetch<{ batches: ImportBatch[] }>('/api/import-batches');
+}
+
+// ─── Identity users (for superadmin/manager assignment) ───
+
+export interface IdentityUser {
+  id: string;
+  email: string;
+  displayName: string;
+  appMemberships: { app: string; role: string; grantedAt: string }[];
+}
+
+/** Fetch the list of users from the identity /admin/users endpoint. Only
+ *  callable by platform admins; non-admins should treat a 403 as "empty". */
+export async function listIdentityUsers(): Promise<{ users: IdentityUser[] }> {
+  if (!accessToken) {
+    const refreshed = await refreshAccessToken();
+    if (!refreshed) {
+      redirectToLogin();
+      throw new ApiError('No session.', 401);
+    }
+  }
+  const url = `${IDENTITY_API_URL}/admin/users`;
+  let response = await fetch(url, {
+    credentials: 'include',
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (response.status === 401) {
+    const refreshed = await refreshAccessToken();
+    if (!refreshed) {
+      redirectToLogin();
+      throw new ApiError('Session expired.', 401);
+    }
+    response = await fetch(url, {
+      credentials: 'include',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({ error: response.statusText }));
+    throw new ApiError(body.error ?? 'Request failed', response.status);
+  }
+  return response.json() as Promise<{ users: IdentityUser[] }>;
 }

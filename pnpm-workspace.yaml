@@ -4,6 +4,7 @@ packages:
   - 'apps/identity/login'
   - 'apps/crm/web'
   - 'apps/accounting/web'
+  - 'apps/employee-portal/web'
   - 'apps/workers/*'
   - 'packages/*'
 

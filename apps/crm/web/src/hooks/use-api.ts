@@ -1,5 +1,23 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { crmFetch, redirectToLogin, type Company, type Contact, type Lead, type Opportunity, type Task, type Activity } from '../api.js';
+import {
+  crmFetch,
+  redirectToLogin,
+  type Company,
+  type Contact,
+  type Lead,
+  type Opportunity,
+  type Task,
+  type Activity,
+  type LeadAttachment,
+  type ImportBatch,
+  getLeadChannels,
+  logOutreachAction,
+  getAttachments,
+  uploadAttachment,
+  deleteAttachment,
+  listImportBatches,
+  listIdentityUsers,
+} from '../api.js';
 
 function useCrmQuery<T>(key: string[], fetcher: () => Promise<T>, enabled = true) {
   return useQuery({
@@ -18,7 +36,12 @@ function useCrmQuery<T>(key: string[], fetcher: () => Promise<T>, enabled = true
   });
 }
 
-export function useActivities(filters: { contactId?: string; companyId?: string; opportunityId?: string; type?: string }) {
+export function useActivities(filters: {
+  contactId?: string;
+  companyId?: string;
+  opportunityId?: string;
+  type?: string;
+}) {
   const qs = new URLSearchParams();
   if (filters.contactId) qs.append('contactId', filters.contactId);
   if (filters.companyId) qs.append('companyId', filters.companyId);
@@ -33,7 +56,10 @@ export function useCreateActivity() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
-      return crmFetch<{ activity: Activity }>('/api/activities', { method: 'POST', body: JSON.stringify(data) });
+      return crmFetch<{ activity: Activity }>('/api/activities', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['activities'] });
@@ -49,7 +75,18 @@ export function useContacts() {
   return useCrmQuery(['contacts'], () => crmFetch<{ contacts: Contact[] }>('/api/contacts'));
 }
 
-export function useLeads(page: number = 1, pageSize: number = 50, status?: string, search?: string, outreachStatus?: string, sortBy?: string, sortOrder?: string) {
+export function useLeads(
+  page: number = 1,
+  pageSize: number = 50,
+  status?: string,
+  search?: string,
+  outreachStatus?: string,
+  sortBy?: string,
+  sortOrder?: string,
+  batchId?: string,
+  channel?: string,
+  stage?: string
+) {
   const qs = new URLSearchParams();
   qs.append('page', String(page));
   qs.append('pageSize', String(pageSize));
@@ -58,13 +95,40 @@ export function useLeads(page: number = 1, pageSize: number = 50, status?: strin
   if (outreachStatus) qs.append('outreachStatus', outreachStatus);
   if (sortBy) qs.append('sortBy', sortBy);
   if (sortOrder) qs.append('sortOrder', sortOrder);
-  return useCrmQuery(['leads', String(page), String(pageSize), status ?? '', search ?? '', outreachStatus ?? '', sortBy ?? '', sortOrder ?? ''], () =>
-    crmFetch<{ leads: Lead[]; page: number; pageSize: number; total: number; totalPages: number; statusCounts: Record<string, number>; outreachStatusCounts: Record<string, number> }>(`/api/leads?${qs.toString()}`)
+  if (batchId) qs.append('batchId', batchId);
+  if (channel) qs.append('channel', channel);
+  if (stage) qs.append('stage', stage);
+  return useCrmQuery(
+    [
+      'leads',
+      String(page),
+      String(pageSize),
+      status ?? '',
+      search ?? '',
+      outreachStatus ?? '',
+      sortBy ?? '',
+      sortOrder ?? '',
+      batchId ?? '',
+      channel ?? '',
+      stage ?? '',
+    ],
+    () =>
+      crmFetch<{
+        leads: Lead[];
+        page: number;
+        pageSize: number;
+        total: number;
+        totalPages: number;
+        statusCounts: Record<string, number>;
+        outreachStatusCounts: Record<string, number>;
+      }>(`/api/leads?${qs.toString()}`)
   );
 }
 
 export function useOpportunities() {
-  return useCrmQuery(['opportunities'], () => crmFetch<{ opportunities: Opportunity[] }>('/api/opportunities'));
+  return useCrmQuery(['opportunities'], () =>
+    crmFetch<{ opportunities: Opportunity[] }>('/api/opportunities')
+  );
 }
 
 export function useTasks() {
@@ -76,15 +140,27 @@ export function useLead(id: string, enabled = true) {
 }
 
 export function useCompany(id: string, enabled = true) {
-  return useCrmQuery(['companies', id], () => crmFetch<{ company: Company }>(`/api/companies/${id}`), enabled);
+  return useCrmQuery(
+    ['companies', id],
+    () => crmFetch<{ company: Company }>(`/api/companies/${id}`),
+    enabled
+  );
 }
 
 export function useContact(id: string, enabled = true) {
-  return useCrmQuery(['contacts', id], () => crmFetch<{ contact: Contact }>(`/api/contacts/${id}`), enabled);
+  return useCrmQuery(
+    ['contacts', id],
+    () => crmFetch<{ contact: Contact }>(`/api/contacts/${id}`),
+    enabled
+  );
 }
 
 export function useOpportunity(id: string, enabled = true) {
-  return useCrmQuery(['opportunities', id], () => crmFetch<{ opportunity: Opportunity }>(`/api/opportunities/${id}`), enabled);
+  return useCrmQuery(
+    ['opportunities', id],
+    () => crmFetch<{ opportunity: Opportunity }>(`/api/opportunities/${id}`),
+    enabled
+  );
 }
 
 export function useDeleteEntity() {
@@ -105,14 +181,25 @@ export function useBulkLeads() {
   return useMutation({
     mutationFn: async (payload: {
       ids: string[];
-      action: 'delete' | 'update_status' | 'update_outreach_status';
+      action:
+        | 'delete'
+        | 'update_status'
+        | 'update_outreach_status'
+        | 'update_tags'
+        | 'assign_owner';
       status?: string;
       outreachStatus?: string;
+      tags?: string[];
+      tagMode?: 'merge' | 'replace';
+      assigneeId?: string;
     }) => {
-      return crmFetch<{ success: boolean; action: string; processed: number; total: number }>('/api/leads/bulk', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
+      return crmFetch<{ success: boolean; action: string; processed: number; total: number }>(
+        '/api/leads/bulk',
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        }
+      );
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['leads'] });
@@ -124,7 +211,10 @@ export function useCreateEntity<T extends Record<string, unknown>>(type: string)
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: T) => {
-      return crmFetch<{ [key: string]: unknown }>(`/api/${type}`, { method: 'POST', body: JSON.stringify(data) });
+      return crmFetch<{ [key: string]: unknown }>(`/api/${type}`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [type] });
@@ -136,7 +226,10 @@ export function useUpdateEntity<T extends Record<string, unknown>>(type: string)
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: T }) => {
-      return crmFetch<{ [key: string]: unknown }>(`/api/${type}/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+      return crmFetch<{ [key: string]: unknown }>(`/api/${type}/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: [type] });
@@ -177,7 +270,9 @@ export function useDraftOutreach(id: string) {
 export function useScoreLead(id: string) {
   return useMutation({
     mutationFn: async () => {
-      return crmFetch<{ score: number; reasoning: string }>(`/api/leads/${id}/score`, { method: 'POST' });
+      return crmFetch<{ score: number; reasoning: string }>(`/api/leads/${id}/score`, {
+        method: 'POST',
+      });
     },
   });
 }
@@ -185,7 +280,9 @@ export function useScoreLead(id: string) {
 export function useSuggestNextAction(id: string) {
   return useMutation({
     mutationFn: async () => {
-      return crmFetch<{ suggestion: string }>(`/api/leads/${id}/suggest-next-action`, { method: 'POST' });
+      return crmFetch<{ suggestion: string }>(`/api/leads/${id}/suggest-next-action`, {
+        method: 'POST',
+      });
     },
   });
 }
@@ -229,7 +326,13 @@ export interface DocumentImportResult {
     confidence: number;
     missingFields: string[];
   };
-  duplicates: { id: string; firstName: string; lastName: string; email: string; phone: string | null }[];
+  duplicates: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string | null;
+  }[];
   rawTextPreview: string;
   markdownPreview?: string;
   conversionWarnings?: string[];
@@ -256,11 +359,19 @@ export function useImportDocument() {
 export function useConfirmDocumentImport() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { lead: Record<string, unknown>; force?: boolean; createCompany?: boolean; createContact?: boolean }) => {
-      return crmFetch<{ lead: Lead; contactId: string | null; companyId: string | null }>('/api/leads/import/document/confirm', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
+    mutationFn: async (data: {
+      lead: Record<string, unknown>;
+      force?: boolean;
+      createCompany?: boolean;
+      createContact?: boolean;
+    }) => {
+      return crmFetch<{ lead: Lead; contactId: string | null; companyId: string | null }>(
+        '/api/leads/import/document/confirm',
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }
+      );
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['leads'] });
@@ -366,4 +477,87 @@ export function useIntegrationStatus() {
   );
 }
 
+// ─── OUTREACH CHANNELS / ATTACHMENTS / IMPORT BATCHES ───
 
+export function useLeadChannels(leadId: string, enabled = true) {
+  return useCrmQuery(['lead-channels', leadId], () => getLeadChannels(leadId), enabled);
+}
+
+export function useLogOutreachAction(leadId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: {
+      channel: string;
+      stage?: string;
+      action?: 'log_attempt' | 'set_stage';
+    }) => {
+      return logOutreachAction(leadId, body);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lead-channels', leadId] });
+      qc.invalidateQueries({ queryKey: ['leads'] });
+      qc.invalidateQueries({ queryKey: ['leads', leadId] });
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+}
+
+export function useAttachments(leadId: string, enabled = true) {
+  return useCrmQuery<LeadAttachment[]>(
+    ['attachments', leadId],
+    async () => {
+      const res = await getAttachments(leadId);
+      return res.attachments;
+    },
+    enabled
+  );
+}
+
+export function useUploadAttachment(leadId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      return uploadAttachment(leadId, file);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['attachments', leadId] });
+    },
+  });
+}
+
+export function useDeleteAttachment(leadId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      return deleteAttachment(id);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['attachments', leadId] });
+    },
+  });
+}
+
+export function useImportBatches() {
+  return useCrmQuery<ImportBatch[]>(['import-batches'], async () => {
+    const res = await listImportBatches();
+    return res.batches;
+  });
+}
+
+export function useIdentityUsers(enabled = true) {
+  return useQuery({
+    queryKey: ['identity-users'],
+    queryFn: async () => {
+      try {
+        const res = await listIdentityUsers();
+        return res.users;
+      } catch (err) {
+        if (err instanceof Error && 'status' in err && err.status === 403) {
+          return [];
+        }
+        throw err;
+      }
+    },
+    enabled,
+  });
+}

@@ -52,11 +52,11 @@ function parseCsv(text: string): CsvRow[] {
   const lines: string[] = [];
   let currentLine = '';
   let inQuotes = false;
-  
+
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
     const nextChar = text[i + 1];
-    
+
     if (char === '"') {
       if (inQuotes && nextChar === '"') {
         // Escaped quote
@@ -76,11 +76,11 @@ function parseCsv(text: string): CsvRow[] {
     }
   }
   if (currentLine) lines.push(currentLine);
-  
+
   if (lines.length < 1) return [];
-  
+
   const headers = parseCsvLine(lines[0]!).map((h) => h.trim().replace(/^["']|["']$/g, ''));
-  
+
   for (let i = 1; i < lines.length; i++) {
     const values = parseCsvLine(lines[i]!);
     const row: CsvRow = {};
@@ -96,11 +96,11 @@ function parseCsvLine(line: string): string[] {
   const values: string[] = [];
   let current = '';
   let inQuotes = false;
-  
+
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
     const nextChar = line[i + 1];
-    
+
     if (char === '"') {
       if (inQuotes && nextChar === '"') {
         // Escaped quote
@@ -125,7 +125,10 @@ function isValidEmail(email: string): boolean {
 }
 
 function normalizeHeader(header: string): string {
-  return header.toLowerCase().replace(/[_\s-]+/g, '').replace(/[^a-z0-9]/g, '');
+  return header
+    .toLowerCase()
+    .replace(/[_\s-]+/g, '')
+    .replace(/[^a-z0-9]/g, '');
 }
 
 function findColumn(row: CsvRow, aliases: string[]): string | undefined {
@@ -144,7 +147,12 @@ function findColumn(row: CsvRow, aliases: string[]): string | undefined {
 
 export function parseContactsCsv(csvText: string): ImportResult<ContactImportRow> {
   const rows = parseCsv(csvText);
-  const result: ImportResult<ContactImportRow> = { success: [], errors: [], duplicates: [], warnings: [] };
+  const result: ImportResult<ContactImportRow> = {
+    success: [],
+    errors: [],
+    duplicates: [],
+    warnings: [],
+  };
   const seenEmails = new Set<string>();
 
   rows.forEach((row, idx) => {
@@ -179,7 +187,12 @@ export function parseContactsCsv(csvText: string): ImportResult<ContactImportRow
 
 export function parseCompaniesCsv(csvText: string): ImportResult<CompanyImportRow> {
   const rows = parseCsv(csvText);
-  const result: ImportResult<CompanyImportRow> = { success: [], errors: [], duplicates: [], warnings: [] };
+  const result: ImportResult<CompanyImportRow> = {
+    success: [],
+    errors: [],
+    duplicates: [],
+    warnings: [],
+  };
   const seenDomains = new Set<string>();
 
   rows.forEach((row, idx) => {
@@ -204,21 +217,58 @@ export function parseCompaniesCsv(csvText: string): ImportResult<CompanyImportRo
 
 export function parseLeadsCsv(csvText: string): ImportResult<LeadImportRow> {
   const rows = parseCsv(csvText);
-  const result: ImportResult<LeadImportRow> = { success: [], errors: [], duplicates: [], warnings: [] };
+  const result: ImportResult<LeadImportRow> = {
+    success: [],
+    errors: [],
+    duplicates: [],
+    warnings: [],
+  };
   const seenEmails = new Set<string>();
   const seenLinkedIn = new Set<string>();
   const seenNameCompany = new Set<string>();
 
-  const _nameAliases = ['fullname', 'name', 'firstname', 'firstname', 'last name', 'last name', 'first_name', 'last_name'];
+  const _nameAliases = [
+    'fullname',
+    'name',
+    'firstname',
+    'firstname',
+    'last name',
+    'last name',
+    'first_name',
+    'last_name',
+  ];
   const emailAliases = ['email', 'emailaddress', 'email address', 'e-mail'];
-  const companyAliases = ['company', 'companyname', 'company name', 'company', 'university', 'school'];
-  const linkedInAliases = ['linkedin', 'linkedinurl', 'linkedin profile', 'profileurl', 'profile url', 'profilelink', 'linkedinlink', 'guessedlinkedinurl'];
+  const companyAliases = [
+    'company',
+    'companyname',
+    'company name',
+    'company',
+    'university',
+    'school',
+  ];
+  const linkedInAliases = [
+    'linkedin',
+    'linkedinurl',
+    'linkedin profile',
+    'profileurl',
+    'profile url',
+    'profilelink',
+    'linkedinlink',
+    'guessedlinkedinurl',
+  ];
   const titleAliases = ['title', 'position', 'jobtitle', 'job title', 'role', 'currentrole'];
   const phoneAliases = ['phone', 'phonenumber', 'phone number', 'mobile', 'tel'];
   const sourceAliases = ['source', 'leadsource', 'lead source', 'category', 'type'];
-  const statusAliases = ['status', 'leadstatus', 'lead status', 'outreachstatus', 'outreach status'];
+  const statusAliases = [
+    'status',
+    'leadstatus',
+    'lead status',
+    'outreachstatus',
+    'outreach status',
+  ];
   const notesAliases = ['notes', 'comments', 'personalizednote', 'note', 'remarks'];
   const connectionAliases = ['connection', 'connectionstatus', 'connected', 'approached'];
+  const tagsAliases = ['tags', 'tag', 'labels'];
 
   rows.forEach((row, idx) => {
     const rowNum = idx + 2;
@@ -247,7 +297,11 @@ export function parseLeadsCsv(csvText: string): ImportResult<LeadImportRow> {
         emailIsPlaceholder = true;
         result.warnings.push({ row: rowNum, message: 'No valid email; placeholder generated' });
       } else {
-        result.errors.push({ row: rowNum, field: 'email', message: 'Missing email and no name to generate placeholder' });
+        result.errors.push({
+          row: rowNum,
+          field: 'email',
+          message: 'Missing email and no name to generate placeholder',
+        });
         return;
       }
     }
@@ -299,12 +353,24 @@ export function parseLeadsCsv(csvText: string): ImportResult<LeadImportRow> {
     const status = findColumn(row, statusAliases) || 'new';
     const notes = findColumn(row, notesAliases) || '';
     const connectionStatus = findColumn(row, connectionAliases) || '';
+    const tagsRaw = findColumn(row, tagsAliases);
+    const tags = tagsRaw
+      ? tagsRaw
+          .split(/[,;]/)
+          .map((t) => t.trim())
+          .filter(Boolean)
+      : undefined;
 
     // Determine outreach status from connection status or status
     let outreachStatus = 'not_approached';
     if (connectionStatus) {
       const cs = connectionStatus.toLowerCase();
-      if (cs.includes('connected') || cs.includes('yes') || cs.includes('true') || cs.includes('1')) {
+      if (
+        cs.includes('connected') ||
+        cs.includes('yes') ||
+        cs.includes('true') ||
+        cs.includes('1')
+      ) {
         outreachStatus = 'connected';
       } else if (cs.includes('approached') || cs.includes('contacted') || cs.includes('sent')) {
         outreachStatus = 'approached';
@@ -312,7 +378,12 @@ export function parseLeadsCsv(csvText: string): ImportResult<LeadImportRow> {
         outreachStatus = 'replied';
       } else if (cs.includes('call') || cs.includes('booked') || cs.includes('meeting')) {
         outreachStatus = 'booked_call';
-      } else if (cs.includes('not') || cs.includes('no') || cs.includes('false') || cs.includes('0')) {
+      } else if (
+        cs.includes('not') ||
+        cs.includes('no') ||
+        cs.includes('false') ||
+        cs.includes('0')
+      ) {
         outreachStatus = 'not_interested';
       }
     }
@@ -323,7 +394,12 @@ export function parseLeadsCsv(csvText: string): ImportResult<LeadImportRow> {
     const location = findColumn(row, ['location', 'city', 'country']);
     const education = findColumn(row, ['education', 'school', 'university', 'degree']);
     const industry = findColumn(row, ['industry', 'sector']);
-    const profileUrl = findColumn(row, ['profileurl', 'profile url', 'profile_link', 'linkedin profile']);
+    const profileUrl = findColumn(row, [
+      'profileurl',
+      'profile url',
+      'profile_link',
+      'linkedin profile',
+    ]);
     const score = findColumn(row, ['score', 'totalscore', 'total score', 'rating']);
     const googleSearch = findColumn(row, ['googlesearch', 'google search', 'searchurl']);
 
@@ -346,18 +422,32 @@ export function parseLeadsCsv(csvText: string): ImportResult<LeadImportRow> {
       emailIsPlaceholder,
       phone: findColumn(row, phoneAliases),
       companyName,
-      companyDomain: findColumn(row, ['companydomain', 'company domain', 'domain', 'website']) || undefined,
+      companyDomain:
+        findColumn(row, ['companydomain', 'company domain', 'domain', 'website']) || undefined,
       linkedinUrl: linkedinUrl || undefined,
       title,
-      source: ['website', 'referral', 'social_media', 'cold_call', 'email_campaign', 'event', 'pdf_upload', 'other'].includes(source) ? source : 'other',
-      status: ['new', 'contacted', 'qualified', 'disqualified', 'converted'].includes(status) ? status : 'new',
+      source: [
+        'website',
+        'referral',
+        'social_media',
+        'cold_call',
+        'email_campaign',
+        'event',
+        'pdf_upload',
+        'other',
+      ].includes(source)
+        ? source
+        : 'other',
+      status: ['new', 'contacted', 'qualified', 'disqualified', 'converted'].includes(status)
+        ? status
+        : 'new',
       notes: combinedNotes || undefined,
       outreachStatus,
       approachedAt: undefined,
       connectionStatus: connectionStatus || undefined,
       sourceSheet: undefined,
       originalRowNumber: rowNum,
-      tags: undefined,
+      tags,
     });
   });
 

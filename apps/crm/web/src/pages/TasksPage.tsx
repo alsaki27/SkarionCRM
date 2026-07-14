@@ -1,6 +1,16 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useTasks, useDeleteEntity } from '../hooks/use-api.js';
-import { CheckSquare, Plus, Search, Trash2, CheckCircle2, Circle, Pencil } from 'lucide-react';
+import {
+  CheckSquare,
+  Plus,
+  Search,
+  Trash2,
+  CheckCircle2,
+  Circle,
+  Pencil,
+  BellRing,
+} from 'lucide-react';
 import { cn } from '../lib/utils.js';
 import { crmFetch } from '../api.js';
 import TaskForm from '../components/forms/TaskForm.js';
@@ -11,18 +21,30 @@ export default function TasksPage() {
   const deleteMutation = useDeleteEntity();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'open' | 'completed'>('all');
+  const [followupsOnly, setFollowupsOnly] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
 
-  const openCreate = () => { setEditTask(null); setModalOpen(true); };
-  const openEdit = (task: Task) => { setEditTask(task); setModalOpen(true); };
-  const closeModal = () => { setModalOpen(false); setEditTask(null); };
+  const openCreate = () => {
+    setEditTask(null);
+    setModalOpen(true);
+  };
+  const openEdit = (task: Task) => {
+    setEditTask(task);
+    setModalOpen(true);
+  };
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditTask(null);
+  };
 
   const tasks = data?.tasks.filter((t) => !t.deletedAt) ?? [];
   const filtered = tasks.filter((t) => {
     const matchesSearch = !search || t.title.toLowerCase().includes(search.toLowerCase());
-    const matchesFilter = filter === 'all' || (filter === 'open' ? !t.completedAt : !!t.completedAt);
-    return matchesSearch && matchesFilter;
+    const matchesFilter =
+      filter === 'all' || (filter === 'open' ? !t.completedAt : !!t.completedAt);
+    const matchesFollowup = !followupsOnly || t.type === 'outreach_followup';
+    return matchesSearch && matchesFilter && matchesFollowup;
   });
 
   const toggleComplete = async (task: Task) => {
@@ -44,7 +66,10 @@ export default function TasksPage() {
           <h1 className="text-xl font-semibold">Tasks</h1>
           <span className="text-sm text-slate-500">({filtered.length})</span>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">
+        <button
+          onClick={openCreate}
+          className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+        >
           <Plus size={16} /> Add Task
         </button>
       </div>
@@ -54,11 +79,31 @@ export default function TasksPage() {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={cn('px-3 py-1.5 rounded-md text-sm border capitalize', filter === f ? 'bg-slate-900 text-white border-slate-900' : 'bg-white border-slate-200 hover:bg-slate-50')}
+            className={cn(
+              'px-3 py-1.5 rounded-md text-sm border capitalize',
+              filter === f
+                ? 'bg-slate-900 text-white border-slate-900'
+                : 'bg-white border-slate-200 hover:bg-slate-50'
+            )}
           >
-            {f} ({f === 'all' ? tasks.length : tasks.filter(t => f === 'open' ? !t.completedAt : !!t.completedAt).length})
+            {f} (
+            {f === 'all'
+              ? tasks.length
+              : tasks.filter((t) => (f === 'open' ? !t.completedAt : !!t.completedAt)).length}
+            )
           </button>
         ))}
+        <button
+          onClick={() => setFollowupsOnly((v) => !v)}
+          className={cn(
+            'px-3 py-1.5 rounded-md text-sm border flex items-center gap-1',
+            followupsOnly
+              ? 'bg-amber-600 text-white border-amber-600'
+              : 'bg-white border-slate-200 hover:bg-slate-50'
+          )}
+        >
+          <BellRing size={14} /> Outreach Follow-ups Only
+        </button>
       </div>
 
       <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-md px-3 py-2">
@@ -76,7 +121,8 @@ export default function TasksPage() {
         {filtered.map((task) => (
           <div
             key={task.id}
-            className={cn('bg-white border border-slate-200 rounded-lg p-4 flex items-center gap-3 hover:shadow-sm transition-shadow',
+            className={cn(
+              'bg-white border border-slate-200 rounded-lg p-4 flex items-center gap-3 hover:shadow-sm transition-shadow',
               task.completedAt && 'opacity-60'
             )}
           >
@@ -88,21 +134,42 @@ export default function TasksPage() {
               )}
             </button>
             <div className="flex-1 min-w-0">
-              <div className={cn('text-sm font-medium', task.completedAt && 'line-through text-slate-400')}>{task.title}</div>
+              <div
+                className={cn(
+                  'text-sm font-medium',
+                  task.completedAt && 'line-through text-slate-400'
+                )}
+              >
+                {task.leadId ? (
+                  <Link to={`/leads/${task.leadId}`} className="text-blue-600 hover:underline">
+                    {task.title}
+                  </Link>
+                ) : (
+                  task.title
+                )}
+              </div>
               <div className="text-xs text-slate-500 mt-0.5">
                 {task.description ?? 'No description'}
                 {task.dueDate && ` · Due ${new Date(task.dueDate).toLocaleDateString()}`}
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className={cn('px-2 py-0.5 rounded text-xs font-medium',
-                task.priority === 'high' ? 'bg-red-100 text-red-700' :
-                task.priority === 'medium' ? 'bg-amber-100 text-amber-700' :
-                'bg-blue-100 text-blue-700'
-              )}>
+              <span
+                className={cn(
+                  'px-2 py-0.5 rounded text-xs font-medium',
+                  task.priority === 'high'
+                    ? 'bg-red-100 text-red-700'
+                    : task.priority === 'medium'
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-blue-100 text-blue-700'
+                )}
+              >
                 {task.priority}
               </span>
-              <button onClick={() => openEdit(task)} className="p-1.5 rounded hover:bg-slate-200 text-slate-500">
+              <button
+                onClick={() => openEdit(task)}
+                className="p-1.5 rounded hover:bg-slate-200 text-slate-500"
+              >
                 <Pencil size={14} />
               </button>
               <button
